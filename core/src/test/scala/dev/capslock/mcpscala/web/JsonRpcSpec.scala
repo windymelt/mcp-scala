@@ -14,15 +14,14 @@
  * limitations under the License.
  */
 
-package dev.capslock.mcpscala.web
+package dev.capslock.mcpscala
+package web
 
-import org.scalatest.funspec.AnyFunSpec
-import org.scalatest.matchers.should.Matchers
 import io.circe._
 import io.circe.parser._
 import io.circe.syntax._
 
-class JsonRpcSpec extends AnyFunSpec with Matchers:
+class JsonRpcSpec extends BaseSpec:
   import JsonRpc._
   import JsonRpc.Codec.given
 
