@@ -18,17 +18,81 @@ package dev.capslock.mcpscala
 
 import cats.effect.IO
 import cats.effect.IOApp
-import cats.syntax.all._
 import com.comcast.ip4s._
 import org.http4s.ember.server._
 import org.http4s.implicits._
 import org.http4s.server.Router
-import scala.concurrent.duration._
-import dev.capslock.mcpscala.web.Server.jsonRpcService
+import dev.capslock.mcpscala.web.Server
+import dev.capslock.mcpscala.web.JsonRpc._
+import dev.capslock.mcpscala.web.JsonRpc.Error
+import io.circe._
 
 object Main extends IOApp.Simple {
-  val services = jsonRpcService
-  val httpApp = Router("/" -> jsonRpcService).orNotFound
+  val methodHandlers: Server.MethodHandlers =
+    Map(
+      "echo" -> { params =>
+        IO.pure(
+          params match {
+            case Params.ByPosition(values) if values.nonEmpty =>
+              Right(values.head)
+            case Params.ByName(values) if values.nonEmpty =>
+              Right(values.values.head)
+            case _ =>
+              Left(
+                Error(
+                  ErrorCode.InvalidParams,
+                  "Expected at least one parameter"
+                )
+              )
+          }
+        )
+      },
+      "add" -> { params =>
+        IO.pure(
+          params match {
+            case Params.ByPosition(values) if values.length >= 2 =>
+              (values(0).asNumber, values(1).asNumber) match {
+                case (Some(a), Some(b)) =>
+                  Right(
+                    Json.fromBigDecimal(
+                      a.toBigDecimal.getOrElse(BigDecimal(0)) + b.toBigDecimal
+                        .getOrElse(BigDecimal(0))
+                    )
+                  )
+                case _ =>
+                  Left(
+                    Error(ErrorCode.InvalidParams, "Parameters must be numbers")
+                  )
+              }
+            case Params.ByName(values)
+                if values.contains("a") && values.contains("b") =>
+              (values("a").asNumber, values("b").asNumber) match {
+                case (Some(a), Some(b)) =>
+                  Right(
+                    Json.fromBigDecimal(
+                      a.toBigDecimal.getOrElse(BigDecimal(0)) + b.toBigDecimal
+                        .getOrElse(BigDecimal(0))
+                    )
+                  )
+                case _ =>
+                  Left(
+                    Error(ErrorCode.InvalidParams, "Parameters must be numbers")
+                  )
+              }
+            case _ =>
+              Left(
+                Error(
+                  ErrorCode.InvalidParams,
+                  "Expected two numeric parameters"
+                )
+              )
+          }
+        )
+      }
+    )
+
+  val services = Server.jsonRpcService(methodHandlers)
+  val httpApp = Router("/" -> services).orNotFound
   val server = EmberServerBuilder
     .default[IO]
     .withHost(ipv4"0.0.0.0")
