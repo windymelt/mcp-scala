@@ -26,10 +26,49 @@ import dev.capslock.mcpscala.web.Server
 import dev.capslock.mcpscala.web.JsonRpc._
 import dev.capslock.mcpscala.web.JsonRpc.Error
 import io.circe._
+import dev.capslock.mcpscala.mcp.*
+import MethodIsJsonRpc.{*, given}
 
 object Main extends IOApp.Simple {
+  import io.circe.syntax.* // for asJson
   val methodHandlers: Server.MethodHandlers =
     Map(
+      "initialize" -> {
+        case Params.ByName(values) =>
+          val capabilities =
+            values("capabilities").as[ClientCapabilities].getOrElse(null)
+          val clientInfo =
+            values("clientInfo").as[Implementation].getOrElse(null)
+          val protocolVersion =
+            values("protocolVersion").as[String].getOrElse("")
+          val request = Method.Initialize(
+            capabilities,
+            clientInfo,
+            protocolVersion
+          )
+          // do initialize
+          val response = InitializeResult(
+            ServerCapabilities(
+            ),
+            Some("This server is still under development"),
+            protocolVersion,
+            Implementation("MCP Scala", "0.1.0")
+          )
+          IO.pure(
+            Right(
+              response.asJson
+            )
+          )
+        case _ =>
+          IO.pure(
+            Left(
+              Error(
+                ErrorCode.InvalidParams,
+                "Expected capabilities, clientInfo, and protocolVersion"
+              )
+            )
+          )
+      },
       "echo" -> { params =>
         IO.pure(
           params match {
