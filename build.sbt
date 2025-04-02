@@ -24,6 +24,7 @@ lazy val root = tlCrossRootProject.aggregate(core)
 
 val http4sVersion = "0.23.30"
 val circeVersion = "0.14.12"
+val fs2Version = "3.12.0"
 
 lazy val core = crossProject(JVMPlatform, JSPlatform)
   .crossType(CrossType.Pure)
@@ -46,8 +47,15 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       "io.circe" %%% "circe-generic",
       "io.circe" %%% "circe-parser"
     ).map(_ % circeVersion),
+    libraryDependencies ++= Seq(
+      "co.fs2" %% "fs2-core" % fs2Version,
+      "co.fs2" %% "fs2-io" % fs2Version
+    ),
     libraryDependencies += "org.scalactic" %%% "scalactic" % "3.2.19",
-    libraryDependencies += "org.scalatest" %%% "scalatest" % "3.2.19" % "test"
+    libraryDependencies += "org.scalatest" %%% "scalatest" % "3.2.19" % "test",
+    scalaJSUseMainModuleInitializer := true,
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) },
+    Compile / mainClass := Some("dev.capslock.mcpscala.StdioMain")
   )
 
 lazy val docs = project.in(file("site")).enablePlugins(TypelevelSitePlugin)

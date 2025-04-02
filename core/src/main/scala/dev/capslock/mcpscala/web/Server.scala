@@ -22,16 +22,17 @@ object Server {
         Ok("MCP Scala.")
       case req @ POST -> Root / "rpc" =>
         req.as[String].flatMap { body =>
-          handleJsonRpcRequest(methodHandlers)(body).flatMap { response =>
-            Ok(response)
-              .map(
-                _.withContentType(`Content-Type`(MediaType.application.json))
-              )
-          }
+          IO.println(body) >> handleJsonRpcRequest(methodHandlers)(body)
+            .flatMap { response =>
+              Ok(response)
+                .map(
+                  _.withContentType(`Content-Type`(MediaType.application.json))
+                )
+            }
         }
     }
 
-  private def handleJsonRpcRequest(
+  def handleJsonRpcRequest(
       methodHandlers: MethodHandlers
   )(body: String): IO[String] = {
     parse(body) match {
