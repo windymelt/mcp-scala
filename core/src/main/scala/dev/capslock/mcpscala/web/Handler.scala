@@ -2,12 +2,6 @@ package dev.capslock.mcpscala.web
 
 import io.circe.syntax._ // for asJson
 import cats.effect.IO
-import cats.effect.IOApp
-import com.comcast.ip4s._
-import org.http4s.ember.server._
-import org.http4s.implicits._
-import org.http4s.server.Router
-import dev.capslock.mcpscala.web.Server
 import dev.capslock.mcpscala.web.JsonRpc._
 import dev.capslock.mcpscala.web.JsonRpc.Error
 import io.circe._
@@ -15,6 +9,17 @@ import dev.capslock.mcpscala.mcp.*
 import MethodIsJsonRpc.{*, given}
 
 object Handler {
+  private def errorResponse(
+      error: JsonRpc.Error
+  ): IO[Either[JsonRpc.Error, Json]] =
+    IO.pure(Left(error))
+
+  private def invalidParams(message: String): IO[Either[JsonRpc.Error, Json]] =
+    errorResponse(Error(ErrorCode.InvalidParams, message))
+
+  private def methodNotFound(message: String): IO[Either[JsonRpc.Error, Json]] =
+    errorResponse(Error(ErrorCode.MethodNotFound, message))
+
   val methodHandlers: Server.MethodHandlers =
     Map(
       "initialize" -> {
@@ -45,13 +50,8 @@ object Handler {
             )
           )
         case _ =>
-          IO.pure(
-            Left(
-              Error(
-                ErrorCode.InvalidParams,
-                "Expected capabilities, clientInfo, and protocolVersion"
-              )
-            )
+          invalidParams(
+            "Expected capabilities, clientInfo, and protocolVersion"
           )
       },
       "tools/list" -> { params =>
@@ -112,34 +112,13 @@ object Handler {
                           )
                         )
                       case _ =>
-                        IO.pure(
-                          Left(
-                            Error(
-                              ErrorCode.InvalidParams,
-                              "min and max must be integers"
-                            )
-                          )
-                        )
+                        invalidParams("min and max must be integers")
                     }
                   case _ =>
-                    IO.pure(
-                      Left(
-                        Error(
-                          ErrorCode.MethodNotFound,
-                          s"Method $name not found"
-                        )
-                      )
-                    )
+                    methodNotFound(s"Method $name not found")
                 }
               case _ =>
-                IO.pure(
-                  Left(
-                    Error(
-                      ErrorCode.InvalidParams,
-                      "Expected name and arguments"
-                    )
-                  )
-                )
+                invalidParams("Expected name and arguments")
             }
         }
       }
