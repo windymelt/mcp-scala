@@ -21,23 +21,23 @@ object HandlerMacros {
   }
 
   // --- byPositionHandler Macro ---
-  inline def byPositionHandler[Res](inline func: Any): HandlerFunc =
-    ${ byPositionHandlerImpl[Res]('func) }
+  inline def byPositionHandler[Params, Res](inline func: Function[Params, IO[Res]])(using io.circe.Encoder[Res]): HandlerFunc =
+    ${ byPositionHandlerImpl[Params, Res]('func) }
 
-  private def byPositionHandlerImpl[Res: Type](func: Expr[Any])(using q: Quotes): Expr[HandlerFunc] = {
+  private def byPositionHandlerImpl[Params, Res: Type](func: Expr[Function[Params, IO[Res]]])(using q: Quotes): Expr[HandlerFunc] = {
     import q.reflect.*
 
     def makeErrorExpr(code: Expr[JsonRpc.ErrorCode], msg: Expr[String]): Expr[JsonRpc.Error] =
       '{ JsonRpc.Error($code, $msg) }
 
-    // Extract param types and body term
-    val (paramTypes: List[TypeRepr], bodyTerm: Term) = func.asTerm match {
-      case Inlined(_, _, Block(List(DefDef(_, List(TermParamClause(params)), _, Some(rhs))), Closure(_, _))) =>
-        (params.map(_.tpt.tpe), rhs)
-      case Lambda(valDefs, rhs) =>
-        (valDefs.map(_.tpt.tpe), rhs)
+    // Extract param types (bodyTerm is not needed for Apply)
+    val paramTypes: List[TypeRepr] = func.asTerm match {
+      case Inlined(_, _, Block(List(DefDef(_, List(TermParamClause(params)), _, _)), Closure(_, _))) =>
+        params.map(_.tpt.tpe)
+      case Lambda(valDefs, _) =>
+        valDefs.map(_.tpt.tpe)
       case Inlined(_, _, Block(Nil, expr)) => expr match {
-         case Lambda(valDefs, rhs) => (valDefs.map(_.tpt.tpe), rhs)
+         case Lambda(valDefs, _) => valDefs.map(_.tpt.tpe)
          case other => report.errorAndAbort(s"Expected lambda in block, got ${other.show}", func); ???
       }
       case other => report.errorAndAbort(s"Expected function literal, got ${other.show}", func); ???
@@ -46,19 +46,17 @@ object HandlerMacros {
     val resultType = TypeRepr.of[Res]
     report.info(s"byPositionHandler: Params: ${paramTypes.map(_.show).mkString(", ")}. Result: ${resultType.show}")
 
-    // Generate decoding logic Expr
-    val decodeFunctionExpr = generatePositionalDecodingCodeExpr(paramTypes) // Pass TypeRepr list, implicitly passes q
+    val decodeFunctionExpr = generatePositionalDecodingCodeExpr(paramTypes)
+    // Pass the original function Expr 'func' to generateApplyCode
+    val applyFunctionExpr = generateApplyCode[Params, Res](func, paramTypes)
 
-    // Generate apply logic Expr
-    val applyFunctionExpr = generateApplyCode[Res](func, paramTypes) // Pass original func Expr
-
-    // Combine in the final HandlerFunc Expr
     '{ (params: JsonRpc.Params) =>
         params match {
           case JsonRpc.Params.ByPosition(paramList) =>
             ${decodeFunctionExpr}(paramList).fold[IO[Either[JsonRpc.Error, Json]]](
               decodeError => IO.pure(Left(decodeError)),
               decodedArgs => { // Seq[Any] at runtime
+                // Execute apply logic at runtime
                 ${applyFunctionExpr}(decodedArgs).flatMap { result => // result is Res
                   summonInline[Encoder[Res]] match {
                     case encoder => IO.pure(Right(encoder(result)))
@@ -75,8 +73,6 @@ object HandlerMacros {
   }
 
   // --- Helper to generate the decoding code Expr ---
-  // Generates Expr[List[Json] => Either[JsonRpc.Error, Seq[Any]]]
-  // Note: 'using q: Quotes' comes BEFORE the parameter list using TypeRepr
   private def generatePositionalDecodingCodeExpr(using q: Quotes)(paramTypes: List[q.reflect.TypeRepr]): Expr[List[Json] => Either[JsonRpc.Error, Seq[Any]]] = {
      import q.reflect.*
      '{ (paramList: List[Json]) =>
@@ -115,20 +111,31 @@ object HandlerMacros {
 
    // --- Helper to generate the function application code ---
    // Generates Expr[Seq[Any] => IO[Res]]
-   // Note: 'using q: Quotes' comes BEFORE the parameter list using TypeRepr
-   private def generateApplyCode[Res: Type](using q: Quotes)(funcExpr: Expr[Any], paramTypes: List[q.reflect.TypeRepr]): Expr[Seq[Any] => IO[Res]] = {
+   private def generateApplyCode[Params, Res: Type](using q: Quotes)(funcExpr: Expr[Function[Params, cats.effect.IO[Res]]], paramTypes: List[q.reflect.TypeRepr]): Expr[Seq[Any] => IO[Res]] = {
        import q.reflect.*
 
+       // Generate code that takes Seq[Any] and applies the original function Expr
        '{ (argsSeq: Seq[Any]) =>
+           // This code runs at runtime
            ${
+               // This code runs during macro expansion to generate the runtime Apply term
+
+               // Build the list of argument Terms with casts from argsSeq Expr
                val argTerms: List[Term] = paramTypes.zipWithIndex.map { case (tpe, i) =>
                    tpe.asType match {
+                       // Generate '{ argsSeq(i).asInstanceOf[t] }.asTerm
                        case '[t] => '{ argsSeq(${Expr(i)}).asInstanceOf[t] }.asTerm
                        case _ => report.errorAndAbort(s"Cannot get Type[T] for param $i: ${tpe.show}"); ???
                    }
                }
+
+               // Construct the Apply term: funcExpr.asTerm(arg1, arg2, ...)
+               // funcExpr.asTerm should represent the lambda function itself
                val funcTerm = funcExpr.asTerm
+               // Apply the function Term to the argument Terms
                val applyTerm = Apply(funcTerm, argTerms)
+
+               // The result should be IO[Res]
                applyTerm.asExprOf[IO[Res]]
            }
        }
