@@ -6,8 +6,7 @@ import JsonRpc._
 import JsonRpc.Error
 import io.circe._
 import dev.capslock.mcpscala.mcp.*
-import MethodIsJsonRpc.{*, given}
-import web.Server
+import MethodIsJsonRpc.given
 
 object Handler {
   type MethodHandler = Params => IO[Either[Error, Json]]

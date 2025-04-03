@@ -18,9 +18,6 @@ package dev.capslock.mcpscala
 package web
 
 import cats.effect._
-import cats.syntax.all._
-import io.circe._
-import io.circe.parser._
 import fs2._
 import fs2.io.stdin
 import fs2.io.stdout

@@ -25,8 +25,6 @@ import org.http4s.server.Router
 import dev.capslock.mcpscala.web.Server
 
 object Main extends IOApp.Simple {
-  import io.circe.syntax.* // for asJson
-
   val services = Server.jsonRpcService(Handler.methodHandlers)
   val httpApp = Router("/" -> services).orNotFound
   val server = EmberServerBuilder
