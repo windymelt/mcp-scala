@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package dev.capslock.mcpscala.web
+package dev.capslock.mcpscala
 
 import io.circe.*
 import io.circe.generic.semiauto.*

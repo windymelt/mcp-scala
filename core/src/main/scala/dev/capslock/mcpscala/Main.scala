@@ -23,16 +23,11 @@ import org.http4s.ember.server._
 import org.http4s.implicits._
 import org.http4s.server.Router
 import dev.capslock.mcpscala.web.Server
-import dev.capslock.mcpscala.web.JsonRpc._
-import dev.capslock.mcpscala.web.JsonRpc.Error
-import io.circe._
-import dev.capslock.mcpscala.mcp.*
-import MethodIsJsonRpc.{*, given}
 
 object Main extends IOApp.Simple {
   import io.circe.syntax.* // for asJson
 
-  val services = Server.jsonRpcService(web.Handler.methodHandlers)
+  val services = Server.jsonRpcService(Handler.methodHandlers)
   val httpApp = Router("/" -> services).orNotFound
   val server = EmberServerBuilder
     .default[IO]

@@ -19,8 +19,6 @@ package dev.capslock.mcpscala
 import cats.effect.IO
 import cats.effect.IOApp
 import dev.capslock.mcpscala.web.StdioServer
-import dev.capslock.mcpscala.web.JsonRpc._
-import dev.capslock.mcpscala.web.JsonRpc.Error
 import dev.capslock.mcpscala.web.Server
 import io.circe._
 import dev.capslock.mcpscala.mcp._
@@ -31,6 +29,6 @@ import MethodIsJsonRpc.{*, given}
 object StdioMain extends IOApp.Simple {
   // StdioServerを使用してサーバーを起動
   def run: IO[Unit] = {
-    StdioServer.serve(web.Handler.methodHandlers)
+    StdioServer.serve(Handler.methodHandlers)
   }
 }

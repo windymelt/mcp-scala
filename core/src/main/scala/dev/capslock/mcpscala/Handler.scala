@@ -1,12 +1,13 @@
-package dev.capslock.mcpscala.web
+package dev.capslock.mcpscala
 
 import io.circe.syntax._ // for asJson
 import cats.effect.IO
-import dev.capslock.mcpscala.web.JsonRpc._
-import dev.capslock.mcpscala.web.JsonRpc.Error
+import JsonRpc._
+import JsonRpc.Error
 import io.circe._
 import dev.capslock.mcpscala.mcp.*
 import MethodIsJsonRpc.{*, given}
+import web.Server
 
 object Handler {
   private def errorResponse(

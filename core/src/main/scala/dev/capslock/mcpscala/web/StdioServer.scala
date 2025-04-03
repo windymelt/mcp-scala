@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package dev.capslock.mcpscala.web
+package dev.capslock.mcpscala
+package web
 
 import cats.effect._
 import cats.syntax.all._

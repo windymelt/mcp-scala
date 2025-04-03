@@ -15,7 +15,6 @@
  */
 
 package dev.capslock.mcpscala
-package web
 
 import io.circe._
 import io.circe.parser._
