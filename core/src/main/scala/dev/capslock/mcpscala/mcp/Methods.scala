@@ -9,6 +9,17 @@ enum Method(val methodName: String) {
       clientInfo: Implementation,
       protocolVersion: String
   ) extends Method("initialize")
+
+  case ListTools(
+      cursor: Option[String]
+  ) extends Method("tools/list")
+
+  case CallTool(
+      name: String,
+      arguments: Option[
+        Map[String, io.circe.Json]
+      ] // arguments は JSON オブジェクトとして受け取る
+  ) extends Method("tools/call")
 }
 
 // definition
@@ -33,6 +44,10 @@ case class Tool(
     inputSchema: io.circe.Json, // wip
     name: String
 )
+case class CallToolResult(isError: Boolean, content: Seq[ContentPart])
+sealed trait ContentPart
+case class TextContentPart(text: String, `type`: String = "text")
+    extends ContentPart
 
 object MethodIsJsonRpc {
   given Codec[Method] = semiauto.deriveCodec
@@ -43,6 +58,8 @@ object MethodIsJsonRpc {
   given Codec[InitializeResult] = semiauto.deriveCodec
   given Codec[ListToolsResult] = semiauto.deriveCodec
   given Codec[Tool] = semiauto.deriveCodec
+  given Codec[CallToolResult] = semiauto.deriveCodec
+  given Codec[ContentPart] = semiauto.deriveCodec
 
   extension (methodJson: io.circe.Json)
     def asMessage: Either[io.circe.DecodingFailure, Method] =

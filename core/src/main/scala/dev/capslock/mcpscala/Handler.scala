@@ -1,129 +1,147 @@
 package dev.capslock.mcpscala
 
-import io.circe.syntax._ // for asJson
+import io.circe.syntax._
 import cats.effect.IO
-import JsonRpc._
-import JsonRpc.Error
-import io.circe._
+import dev.capslock.mcpscala.JsonRpc // JsonRpc.scala が同じパッケージにあると仮定
 import dev.capslock.mcpscala.mcp.*
-import MethodIsJsonRpc.given
+import dev.capslock.mcpscala.macros.HandlerMacros.{
+  byNameHandler,
+  byPositionHandler,
+} // 新しいマクロをインポート
 
 object Handler {
-  type MethodHandler = Params => IO[Either[Error, Json]]
+  // MethodHandler と MethodHandlers の型エイリアスはマクロ利用側では不要になるかも
+  type MethodHandler = JsonRpc.Params => IO[Either[JsonRpc.Error, io.circe.Json]]
   type MethodHandlers = Map[String, MethodHandler]
 
-  private def errorResponse(
-      error: JsonRpc.Error
-  ): IO[Either[JsonRpc.Error, Json]] =
-    IO.pure(Left(error))
+  // --- ビジネスロジック関数 ---
 
-  private def invalidParams(message: String): IO[Either[JsonRpc.Error, Json]] =
-    errorResponse(Error(ErrorCode.InvalidParams, message))
+  private def handleInitialize(
+      capabilities: ClientCapabilities,
+      clientInfo: Implementation,
+      protocolVersion: String
+  ): IO[InitializeResult] = {
+    val response = InitializeResult(
+      ServerCapabilities(
+        tools = Some(Tools()) // TODO: 実際のツール情報
+      ),
+      Some("This server is still under development"),
+      protocolVersion,
+      Implementation("MCP Scala", "0.1.0")
+    )
+    IO.pure(response)
+  }
 
-  private def methodNotFound(message: String): IO[Either[JsonRpc.Error, Json]] =
-    errorResponse(Error(ErrorCode.MethodNotFound, message))
-
-  val methodHandlers: MethodHandlers =
-    Map(
-      "initialize" -> {
-        case Params.ByName(values) =>
-          val capabilities =
-            values("capabilities").as[ClientCapabilities].getOrElse(null)
-          val clientInfo =
-            values("clientInfo").as[Implementation].getOrElse(null)
-          val protocolVersion =
-            values("protocolVersion").as[String].getOrElse("")
-          val request = Method.Initialize(
-            capabilities,
-            clientInfo,
-            protocolVersion
-          )
-          // do initialize
-          val response = InitializeResult(
-            ServerCapabilities(
-              tools = Some(Tools())
+  private def handleListTools(
+      cursor: Option[String]
+  ): IO[ListToolsResult] = {
+    // TODO: cursor を使ったページネーション
+    import io.circe.Json
+    val response = ListToolsResult(
+      List(
+        Tool(
+          inputSchema = Json.obj(
+            "type" -> Json.fromString("object"),
+            "properties" -> Json.obj(
+              "min" -> Json.obj("type" -> Json.fromString("number")),
+              "max" -> Json.obj("type" -> Json.fromString("number"))
             ),
-            Some("This server is still under development"),
-            protocolVersion,
-            Implementation("MCP Scala", "0.1.0")
-          )
-          IO.pure(
-            Right(
-              response.asJson
-            )
-          )
-        case _ =>
-          invalidParams(
-            "Expected capabilities, clientInfo, and protocolVersion"
-          )
-      },
-      "tools/list" -> { params =>
-        val response = ListToolsResult(
-          List(
-            Tool(
-              inputSchema = Json.obj(
-                "properties" -> Json.obj(
-                  "min" -> Json.obj("type" -> Json.fromString("number")),
-                  "max" -> Json.obj("type" -> Json.fromString("number"))
-                ),
-                "type" -> Json.fromString("object"),
-                "required" -> Json
-                  .arr(Json.fromString("min"), Json.fromString("max"))
-              ),
-              name = "randomNumber"
-            )
-          )
+            "required" -> Json
+              .arr(Json.fromString("min"), Json.fromString("max"))
+          ),
+          name = "randomNumber"
         )
-        params match {
-          case Params.ByPosition(values) =>
-            val cursor = values.lift(0).flatMap(_.asString)
-            // ignore cursor now
-            IO.pure(Right(response.asJson))
-          case Params.ByName(values) =>
-            val cursor = values.get("cursor").flatMap(_.asString)
-            // ignore cursor now
-            IO.pure(Right(response.asJson))
-        }
-      },
-      "tools/call" -> { params =>
-        params match {
-          case Params.ByName(values) =>
-            val name = values.get("name").map(_.asString).flatten
-            val arguments = values.get("arguments").map(_.asObject).flatten
-            (name, arguments) match {
-              case (Some(name), Some(arguments)) =>
-                name match {
-                  case "randomNumber" =>
-                    val min =
-                      arguments("min").flatMap(_.asNumber).flatMap(_.toInt)
-                    val max =
-                      arguments("max").flatMap(_.asNumber).flatMap(_.toInt)
-                    (min, max) match {
-                      case (Some(min), Some(max)) =>
-                        val random = scala.util.Random.between(min, max)
-                        IO.pure(
-                          Right(
-                            Json.obj(
-                              "isError" -> Json.fromBoolean(false),
-                              "content" -> Json.arr(
-                                Json.obj(
-                                  "type" -> Json.fromString("text"),
-                                  "text" -> Json.fromString(random.toString())
-                                )
-                              )
-                            )
-                          )
-                        )
-                      case _ =>
-                        invalidParams("min and max must be integers")
-                    }
-                  case _ =>
-                    methodNotFound(s"Method $name not found")
+      )
+    )
+    IO.pure(response)
+  }
+
+
+  // Circe コーデック (Methods.scala に移動推奨)
+  private def handleCallTool(
+      name: String,
+      arguments: Option[Map[String, io.circe.Json]]
+  ): IO[CallToolResult] = {
+    name match {
+      case "randomNumber" =>
+        arguments match {
+          case Some(args) =>
+            val minResult = args.get("min").flatMap(_.as[Int].toOption)
+            val maxResult = args.get("max").flatMap(_.as[Int].toOption)
+
+            (minResult, maxResult) match {
+              case (Some(min), Some(max)) =>
+                if (min >= max) {
+                  IO.pure(
+                    CallToolResult(
+                      isError = true,
+                      content =
+                        Seq(TextContentPart("min must be less than max"))
+                    )
+                  )
+                } else {
+                  val random = scala.util.Random.between(min, max)
+                  IO.pure(
+                    CallToolResult(
+                      isError = false,
+                      content = Seq(TextContentPart(random.toString))
+                    )
+                  )
                 }
               case _ =>
-                invalidParams("Expected name and arguments")
+                IO.pure(
+                  CallToolResult(
+                    isError = true,
+                    content = Seq(
+                      TextContentPart(
+                        "min and max arguments are required and must be integers"
+                      )
+                    )
+                  )
+                )
             }
+          case None =>
+            IO.pure(
+              CallToolResult(
+                isError = true,
+                content = Seq(
+                  TextContentPart("arguments are required for randomNumber")
+                )
+              )
+            )
         }
-      }
-    )
+      case _ =>
+        IO.pure(
+          CallToolResult(
+            isError = true,
+            content = Seq(TextContentPart(s"Tool '$name' not found"))
+          )
+        )
+    }
+  }
+
+  // --- マクロを使って methodHandlers を生成 ---
+  import MethodIsJsonRpc.given
+  val methodHandlers: MethodHandlers = Map(
+    "initialize" -> byNameHandler {
+      // PartialFunction の case を使う
+      case (
+            capabilities: ClientCapabilities,
+            clientInfo: Implementation,
+            protocolVersion: String
+          ) =>
+        handleInitialize(capabilities, clientInfo, protocolVersion)
+    },
+    "tools/list" -> byPositionHandler { // byPositionHandler を使う
+      (cursor: Option[String]) => // 通常の関数リテラル
+        handleListTools(cursor)
+    },
+    "tools/call" -> byNameHandler {
+      case (name: String, arguments: Option[Map[String, io.circe.Json]]) =>
+        handleCallTool(name, arguments)
+    }
+    // 他のハンドラも同様に追加
+  )
+
+  // 古いエラーヘルパーと Map 定義は削除
 }

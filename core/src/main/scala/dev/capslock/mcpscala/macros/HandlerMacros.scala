@@ -3,53 +3,177 @@ package dev.capslock.mcpscala.macros
 import scala.quoted.*
 import cats.effect.IO
 import scala.compiletime.summonInline
-import io.circe.{Json, Encoder, Decoder, DecodingFailure}
-import dev.capslock.mcpscala.JsonRpc // Assuming in dev.capslock.mcpscala package
-// Import the runtime helper - no longer needed for this approach
-// import dev.capslock.mcpscala.macros.HandlerMacrosRuntime.*
+import io.circe.{Json, Encoder, Decoder}
+import dev.capslock.mcpscala.JsonRpc
 
 object HandlerMacros {
 
   type HandlerFunc = JsonRpc.Params => IO[Either[JsonRpc.Error, Json]]
 
-  // --- byNameHandler Macro (Placeholder) ---
-  // TODO: Apply the same Encoder logic here later
-  inline def byNameHandler[Res](inline func: PartialFunction[Any, IO[Res]]): HandlerFunc =
-    ${ byNameHandlerImpl('func) }
+  // --- byNameHandler マクロ ---
+  inline def byNameHandler[Res](inline func: PartialFunction[Any, IO[Res]])(using enc: Encoder[Res]): HandlerFunc =
+    ${ byNameHandlerImpl('func, 'enc) }
 
-  private def byNameHandlerImpl[Res: Type](func: Expr[PartialFunction[Any, IO[Res]]])(using q: Quotes): Expr[HandlerFunc] = {
+  private def byNameHandlerImpl[Res: Type](func: Expr[PartialFunction[Any, IO[Res]]], encoderExpr: Expr[Encoder[Res]])(using q: Quotes): Expr[HandlerFunc] = {
     import q.reflect.*
-    report.warning("byNameHandler not implemented yet")
-    '{ (params: JsonRpc.Params) => IO.pure(Left(JsonRpc.Error(JsonRpc.ErrorCode.InternalError, "Not implemented"))) }
+
+    // 型情報を取得
+    val funcType = func.asTerm.tpe.widen
+    
+    // PartialFunctionのケースパターンを抽出する (match-case部分の分析)
+    val casePatterns = extractCasePatterns(func)
+    
+    // caseパターンが見つからなかった場合はエラー
+    if (casePatterns.isEmpty) {
+      report.errorAndAbort("byNameHandler requires a partial function with case patterns")
+    }
+    
+    // 結果を組み立てる
+    '{ 
+      // ハンドラ関数を定義する際、エンコーダはキャプチャした変数として渡す
+      val encoderCaptured = $encoderExpr
+      
+      (params: JsonRpc.Params) =>
+        params match {
+          case JsonRpc.Params.ByName(values) =>
+            // 値をMapからタプルに変換
+            val argsAny: Any = extractNamedParamsToTuple(values)
+            
+            // PartialFunctionを適用
+            val pfunc = $func
+            
+            // PartialFunctionが適用可能か確認
+            if (pfunc.isDefinedAt(argsAny)) {
+              try {
+                // 関数を実行
+                pfunc(argsAny).flatMap { result =>
+                  // キャプチャしたエンコーダを使用
+                  IO.pure(Right(encoderCaptured(result)))
+                }.handleErrorWith { error =>
+                  IO.pure(Left(JsonRpc.Error(JsonRpc.ErrorCode.InternalError, s"Runtime error: ${error.getMessage}")))
+                }
+              } catch {
+                case e: Throwable =>
+                  IO.pure(Left(JsonRpc.Error(JsonRpc.ErrorCode.InternalError, s"Error applying function: ${e.getMessage}")))
+              }
+            } else {
+              IO.pure(Left(JsonRpc.Error(JsonRpc.ErrorCode.InvalidParams, "Parameters do not match any pattern")))
+            }
+          
+          case JsonRpc.Params.ByPosition(_) =>
+            IO.pure(Left(JsonRpc.Error(JsonRpc.ErrorCode.InvalidParams, "Expected named parameters")))
+        }
+    }
+  }
+  
+  private def extractCasePatterns(using q: Quotes)(funcExpr: Expr[PartialFunction[Any, Any]]): List[q.reflect.CaseDef] = {
+    import q.reflect.*
+    
+    // PartialFunctionのAST解析
+    funcExpr.asTerm match {
+      // Match式の場合
+      case Block(List(DefDef(_, _, _, Some(Match(_, cases)))), _) => cases
+      // 直接Match式の場合
+      case Match(_, cases) => cases
+      // その他の場合（lambda式など）
+      case _ => Nil
+    }
   }
 
-  // --- byPositionHandler Macro ---
-  // Use type parameter F and add 'using Encoder[Res]'
-  inline def byPositionHandler[F, Res](inline func: F)(using enc: Encoder[Res]): HandlerFunc =
-    // Pass the summoned Encoder Expr to the Impl method
-    ${ byPositionHandlerImpl[F, Res]('func, 'enc) }
+  private def extractNamedParamsToTuple(using q: Quotes)(paramsMap: Expr[Map[String, Json]]): Expr[Any] = {
+    '{ 
+      // Mapから値を取得し、必要に応じてタプルに変換する汎用的なロジック
+      val map = $paramsMap
+      // 実行時にマップから値を取り出す
+      extractMapValues(map)
+    }
+  }
+  
+  // 実行時にマップから値を取り出すヘルパー関数
+  private def extractMapValues(map: Map[String, Json]): Any = {
+    // マップのキーの数によって、適切なタプルまたは単一値を返す
+    map.size match {
+      case 1 => 
+        // 1つの値の場合は単純に最初の値を返す
+        map.values.head
+      case 2 =>
+        // タプル化が必要な場合は、キーでソートして順番に取り出す
+        val sortedValues = map.toList.sortBy(_._1).map(_._2)
+        (sortedValues(0), sortedValues(1))
+      case 3 =>
+        val sortedValues = map.toList.sortBy(_._1).map(_._2)
+        (sortedValues(0), sortedValues(1), sortedValues(2))
+      case _ =>
+        // その他のケースはマップをそのまま返す
+        map
+    }
+  }
 
-  // Implementation takes Expr[F] and Expr[Encoder[Res]]
-  private def byPositionHandlerImpl[F: Type, Res: Type](func: Expr[F], encoderExpr: Expr[Encoder[Res]])(using q: Quotes): Expr[HandlerFunc] = {
+  // --- byPositionHandler マクロ ---
+ 
+  inline def byPositionHandler[F](inline func: F): HandlerFunc =
+    ${ byPositionHandlerImpl('func) }
+    
+  private def byPositionHandlerImpl[F: Type](func: Expr[F])(using q: Quotes): Expr[HandlerFunc] = {
+    import q.reflect.*
+    
+    // 1. 関数型からIO[Res]のRes部分を抽出
+    val fTypeRepr = TypeRepr.of[F]
+    
+    def extractIOResultType(tpe: TypeRepr): TypeRepr = {
+      tpe.dealias match {
+        case AppliedType(base, args) if base =:= TypeRepr.of[IO] =>
+          // IO[Res]の場合、型パラメータ（Res）を返す
+          args.head
+        case AppliedType(_, resultType :: _) =>
+          // 関数型の場合、戻り値型を再帰的に探索
+          extractIOResultType(resultType)
+        case _ =>
+          report.errorAndAbort(s"戻り値型からIO[Res]が見つかりませんでした: ${tpe.show}")
+      }
+    }
+    
+    val resultTypeRepr = extractIOResultType(fTypeRepr)
+    
+    // 2. 抽出した型に対応するEncoderを取得し、既存のマクロ実装を呼び出す
+    resultTypeRepr.asType match {
+      case '[res] =>
+        // マクロ展開されたコード内で解決するように変更
+        // このようにして実行時に具体的なエンコーダを解決する
+        '{
+          val encoderCaptured = summonInline[Encoder[res]]
+          ${byPositionHandlerImplWithCapture[F, res](func, 'encoderCaptured)}
+        }
+      case _ =>
+        report.errorAndAbort(s"型情報を取得できませんでした: ${resultTypeRepr.show}")
+    }
+  }
+
+  // エンコーダをキャプチャした変数を使用するためのヘルパー関数
+  private def byPositionHandlerImplWithCapture[F: Type, Res: Type](func: Expr[F], encoderExpr: Expr[Encoder[Res]])(using q: Quotes): Expr[HandlerFunc] = {
     import q.reflect.*
 
     def makeErrorExpr(code: Expr[JsonRpc.ErrorCode], msg: Expr[String]): Expr[JsonRpc.Error] =
       '{ JsonRpc.Error($code, $msg) }
 
-    // 1. Extract param types
-    val paramTypes: List[TypeRepr] = func.asTerm match {
-      case Inlined(_, _, Block(List(DefDef(_, List(TermParamClause(params)), _, _)), Closure(_, _))) =>
-        params.map(_.tpt.tpe)
-      case Lambda(valDefs, _) =>
-        valDefs.map(_.tpt.tpe)
-      case Inlined(_, _, Block(Nil, expr)) => expr match {
-         case Lambda(valDefs, _) => valDefs.map(_.tpt.tpe)
-         case other => report.errorAndAbort(s"Expected lambda in block, got ${other.show}", func); ???
-      }
-      case other => report.errorAndAbort(s"Expected function literal, got ${other.show}", func); ???
+    // 1. Extract parameter types from TypeRepr.of[F]
+    val fTypeRepr = TypeRepr.of[F]
+    val paramTypes: List[TypeRepr] = fTypeRepr.dealias match {
+      // Match MethodType or LambdaType (PolyType might need handling too)
+      case MethodType(_, paramTpes, _) => paramTpes
+      case mt @ AppliedType(base, args) if mt <:< TypeRepr.of[Function] =>
+        // For FunctionN[T1, ..., TN, R], args are T1, ..., TN, R
+        // We need T1, ..., TN
+        if (args.nonEmpty) args.init else Nil
+      // Handle cases like () => IO[Res] which might not be MethodType directly
+      case AppliedType(ioType, _) if ioType =:= TypeRepr.of[IO] =>
+        Nil // Zero parameters case
+      case other =>
+        report.errorAndAbort(s"byPositionHandler expects a function type, but got: ${other.show}", func)
     }
 
-    val resultType = TypeRepr.of[Res] // For info only
+    // We already have Type[Res] from the macro definition
+    val resultType = TypeRepr.of[Res]
     report.info(s"byPositionHandler: Params: ${paramTypes.map(_.show).mkString(", ")}. Result: ${resultType.show}")
 
     // 2. Generate decoding logic Expr
@@ -58,26 +182,36 @@ object HandlerMacros {
     // 3. Generate apply logic Expr
     val applyFunctionExpr = generateApplyCode[Res](func, paramTypes)
 
-    // 4. Combine in the final HandlerFunc Expr, using the passed encoderExpr
-    '{ (params: JsonRpc.Params) =>
-        params match {
-          case JsonRpc.Params.ByPosition(paramList) =>
-            ${decodeFunctionExpr}(paramList).fold[IO[Either[JsonRpc.Error, Json]]](
-              decodeError => IO.pure(Left(decodeError)),
-              decodedArgs => { // Seq[Any] at runtime
-                val theApplyFunction: Seq[Any] => IO[Res] = ${applyFunctionExpr}
-                theApplyFunction(decodedArgs).flatMap { result => // result is Res
-                  // Use the encoderExpr passed from the macro call site
-                  val encoder: Encoder[Res] = ${encoderExpr}
-                  IO.pure(Right(encoder(result)))
-                }.handleErrorWith { throwable =>
-                  IO.pure(Left(JsonRpc.Error(JsonRpc.ErrorCode.InternalError, "Runtime error: " + throwable.getMessage)))
-                }
-              }
-            )
-          case JsonRpc.Params.ByName(_) =>
-            IO.pure(Left(${makeErrorExpr('{JsonRpc.ErrorCode.InvalidParams}, Expr("Expected positional parameters"))}))
-        }
+    // 4. Combine in the final HandlerFunc Expr
+    '{ 
+       (params: JsonRpc.Params) =>
+         params match {
+           case JsonRpc.Params.ByPosition(paramList) =>
+             ${decodeFunctionExpr}(paramList).fold[IO[Either[JsonRpc.Error, Json]]](
+               decodeError => IO.pure(Left(decodeError)),
+               decodedArgs => {
+                 val theApplyFunction: Seq[Any] => IO[Res] = ${applyFunctionExpr}
+                 theApplyFunction(decodedArgs).flatMap { result =>
+                   // キャプチャしたエンコーダを使用
+                   IO.pure(Right($encoderExpr(result)))
+                 }.handleErrorWith { throwable =>
+                   IO.pure(Left(JsonRpc.Error(JsonRpc.ErrorCode.InternalError, "Runtime error: " + throwable.getMessage)))
+                 }
+               }
+             )
+           case JsonRpc.Params.ByName(_) =>
+             IO.pure(Left(${makeErrorExpr('{JsonRpc.ErrorCode.InvalidParams}, '{s"Expected positional parameters"})}))
+         }
+     }
+  }
+
+  private def byPositionHandlerImpl[F: Type, Res: Type](func: Expr[F], encoderExpr: Expr[Encoder[Res]])(using q: Quotes): Expr[HandlerFunc] = {
+    import q.reflect.*
+
+    // エンコーダをキャプチャした変数として提供する
+    '{ 
+      val encoderCaptured = $encoderExpr
+      ${byPositionHandlerImplWithCapture[F, Res](func, 'encoderCaptured)}
     }
   }
 
@@ -96,7 +230,7 @@ object HandlerMacros {
                    '{
                      val idxTerm = ${Expr(index)}
                      val jsonValue = paramList(idxTerm)
-                     summonInline[Decoder[t]] match { // summonInline Decoder inside generated code
+                     summonInline[Decoder[t]] match {
                        case decoder => decoder.decodeJson(jsonValue) match {
                          case Right(value) => Right(value.asInstanceOf[Any])
                          case Left(df) => Left(JsonRpc.Error(JsonRpc.ErrorCode.InvalidParams, s"Decode fail index $idxTerm: ${df.getMessage}"))
@@ -118,7 +252,6 @@ object HandlerMacros {
    }
 
    // --- Helper to generate the function application code ---
-   // Generates Expr[Seq[Any] => IO[Res]]
    private def generateApplyCode[Res: Type](using q: Quotes)(funcExpr: Expr[Any], paramTypes: List[q.reflect.TypeRepr]): Expr[Seq[Any] => IO[Res]] = {
        import q.reflect.*
        '{ (argsSeq: Seq[Any]) =>
@@ -135,5 +268,4 @@ object HandlerMacros {
            }
        }
    }
-
 }
