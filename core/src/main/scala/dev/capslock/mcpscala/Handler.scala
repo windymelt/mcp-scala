@@ -10,6 +10,9 @@ import MethodIsJsonRpc.{*, given}
 import web.Server
 
 object Handler {
+  type MethodHandler = Params => IO[Either[Error, Json]]
+  type MethodHandlers = Map[String, MethodHandler]
+
   private def errorResponse(
       error: JsonRpc.Error
   ): IO[Either[JsonRpc.Error, Json]] =
@@ -21,7 +24,7 @@ object Handler {
   private def methodNotFound(message: String): IO[Either[JsonRpc.Error, Json]] =
     errorResponse(Error(ErrorCode.MethodNotFound, message))
 
-  val methodHandlers: Server.MethodHandlers =
+  val methodHandlers: MethodHandlers =
     Map(
       "initialize" -> {
         case Params.ByName(values) =>

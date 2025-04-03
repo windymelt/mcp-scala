@@ -9,13 +9,11 @@ import io.circe.syntax._
 import org.http4s._
 import org.http4s.dsl.io._
 import org.http4s.headers.`Content-Type`
+import Handler.MethodHandlers
 
 object Server {
   import JsonRpc._
   import JsonRpc.Codec.given
-
-  type MethodHandler = Params => IO[Either[Error, Json]]
-  type MethodHandlers = Map[String, MethodHandler]
 
   def jsonRpcService(methodHandlers: MethodHandlers = Map.empty) =
     HttpRoutes.of[IO] {

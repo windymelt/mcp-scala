@@ -20,6 +20,7 @@ package web
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import io.circe._
+import Handler.MethodHandlers
 
 class ServerSpec extends BaseSpec:
   import JsonRpc._

@@ -24,11 +24,9 @@ import io.circe.parser._
 import fs2._
 import fs2.io.stdin
 import fs2.io.stdout
+import Handler.MethodHandlers
 
 object StdioServer {
-  import JsonRpc._
-  import JsonRpc.Codec.given
-  import Server.MethodHandlers
 
   /** サーバーを起動し、標準入出力でJSONRPCリクエストを処理する
     *
