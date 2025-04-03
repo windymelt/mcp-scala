@@ -37,7 +37,7 @@ object HandlerMacros {
         params match {
           case JsonRpc.Params.ByName(values) =>
             // 値をMapからタプルに変換
-            val argsAny: Any = extractNamedParamsToTuple(values)
+            val argsAny: Any = extractMapValues(values)
             
             // PartialFunctionを適用
             val pfunc = $func
@@ -77,15 +77,6 @@ object HandlerMacros {
       case Match(_, cases) => cases
       // その他の場合（lambda式など）
       case _ => Nil
-    }
-  }
-
-  private def extractNamedParamsToTuple(using q: Quotes)(paramsMap: Expr[Map[String, Json]]): Expr[Any] = {
-    '{ 
-      // Mapから値を取得し、必要に応じてタプルに変換する汎用的なロジック
-      val map = $paramsMap
-      // 実行時にマップから値を取り出す
-      extractMapValues(map)
     }
   }
   
