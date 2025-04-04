@@ -6,7 +6,7 @@ import dev.capslock.mcpscala.JsonRpc // JsonRpc.scala が同じパッケージ�
 import dev.capslock.mcpscala.mcp.*
 import dev.capslock.mcpscala.macros.HandlerMacros.{
   byNameHandler,
-  byPositionHandler,
+  //byPositionHandler,
 } // 新しいマクロをインポート
 
 object Handler {
@@ -132,10 +132,10 @@ object Handler {
           ) =>
         handleInitialize(capabilities, clientInfo, protocolVersion)
     },
-    "tools/list" -> byPositionHandler {
-      case cursor: Option[String] => // PartialFunctionに変更
-        handleListTools(cursor)
-    },
+    // "tools/list" -> byPositionHandler {
+    //   case cursor: Option[String] => // PartialFunctionに変更
+    //     handleListTools(cursor)
+    // },
     "tools/call" -> byNameHandler {
       case (name: String, arguments: Option[Map[String, io.circe.Json]]) =>
         handleCallTool(name, arguments)

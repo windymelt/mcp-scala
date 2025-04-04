@@ -15,27 +15,6 @@ object HandlerMacros {
       using enc: Encoder[Res]
   ): HandlerFunc =
     ${ byNameHandlerImpl('func, 'enc) }
-    
-  // --- byPositionHandler マクロ （現在はスケルトンのみ）---
-  inline def byPositionHandler[Res](inline func: PartialFunction[Any, IO[Res]])(
-      using enc: Encoder[Res]
-  ): HandlerFunc =
-    ${ byPositionHandlerImpl('func, 'enc) }
-  
-  private def byPositionHandlerImpl[Res: Type](
-      func: Expr[PartialFunction[Any, IO[Res]]],
-      encoderExpr: Expr[Encoder[Res]]
-  )(using quotes: Quotes): Expr[HandlerFunc] = {
-    import quotes.reflect.*
-    
-    // TODO: 実装は後で行う
-    '{
-      (params: JsonRpc.Params) => IO.pure(Left(JsonRpc.Error(
-        JsonRpc.ErrorCode.InternalError,
-        "byPositionHandler is not implemented yet"
-      )))
-    }
-  }
 
   private def byNameHandlerImpl[Res: Type](
       func: Expr[PartialFunction[Any, IO[Res]]],
@@ -126,41 +105,6 @@ object HandlerMacros {
       }
     }
   }
-  // タプルの型から要素の型を抽出
-  private def extractTupleElementTypes(using quotes: Quotes)(
-      typeRepr: quotes.reflect.TypeRepr
-  ): List[quotes.reflect.TypeRepr] = {
-    import quotes.reflect.*
-
-    typeRepr match {
-      // TupleN[A, B, ...] の形
-      case AppliedType(_, args) if typeRepr.show.startsWith("Tuple") =>
-        args
-      // 単一の型の場合
-      case _ => List(typeRepr)
-    }
-  }
-
-  // ケース節からパラメータ名を抽出
-  private def extractParameterNames(using quotes: Quotes)(
-      caseClause: quotes.reflect.CaseDef
-  ): List[String] = {
-    import quotes.reflect.*
-
-    caseClause match {
-      // タプルパターンの場合
-      case CaseDef(Typed(Bind(_, Unapply(_, _, patterns)), _), _, _) =>
-        patterns.collect { case Typed(Bind(name, _), _) =>
-          name
-        }
-
-      // 単一パラメータの場合
-      case CaseDef(Typed(Bind(name, _), _), _, _) =>
-        List(name)
-
-      case _ => Nil
-    }
-  }
 
   // PartialFunctionからパラメータの情報を抽出する
   private def extractPartialFunctionParams[Res: Type, F[_]: Type](
@@ -181,15 +125,13 @@ object HandlerMacros {
         cases.headOption.flatMap { caseClause =>
           caseClause match {
             // タプルパターンの場合
-            case CaseDef(
-                  Typed(Bind(_, Unapply(_, _, patternArgs)), patternTpe),
-                  _,
-                  _
-                ) =>
-              // パラメータの型と名前を抽出
-              val tpeRepr = patternTpe.tpe
-              val paramTypes = extractTupleElementTypes(using quotes)(tpeRepr)
-              val paramNames = extractParameterNames(using quotes)(caseClause)
+            case CaseDef(TypedOrTest(t: Unapply, _), _ , _) =>
+              val paramTypes = t.patterns.map {
+                case Bind(a, TypedOrTest(_,b)) => b.tpe
+              }
+              val paramNames = t.patterns.map {
+                case Bind(a, TypedOrTest(_,b)) => a
+              }
               Some((paramTypes, paramNames))
 
             // 単一パラメータの場合
