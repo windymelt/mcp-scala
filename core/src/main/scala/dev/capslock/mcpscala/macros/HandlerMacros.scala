@@ -39,6 +39,87 @@ object HandlerMacros {
 
   // JSONRPCハンドラを生成する補助関数
   // 最も基本的なハンドラーを生成する関数
+  // パラメータ型に対応するデコーダーの式を生成する関数
+  private def generateDecoderExpr[T: Type](using quotes: Quotes): Expr[Decoder[T]] = {
+    import quotes.reflect.*
+    
+    val tpe = TypeRepr.of[T]
+    Expr.summon[Decoder[T]] match {
+      case Some(decoderExpr) => decoderExpr
+      case None => report.errorAndAbort(s"No Decoder instance found for type ${tpe.show}")
+    }
+  }
+  
+  // 単一パラメータの抽出コードを生成する関数
+  private def generateParamExtraction[T: Type](
+      using quotes: Quotes
+  )(paramName: String, valueMapExpr: Expr[Map[String, Json]]): Expr[Option[T]] = {
+    import quotes.reflect.*
+    
+    val decoderExpr = generateDecoderExpr[T]
+    
+    '{
+      $valueMapExpr.get(${ Expr(paramName) }).flatMap(_.as[T](using $decoderExpr).toOption)
+    }
+  }
+  
+  // タプル型を生成する関数
+  private def generateTupleType(using quotes: Quotes)(
+      types: List[quotes.reflect.TypeRepr]
+  ): quotes.reflect.TypeRepr = {
+    import quotes.reflect.*
+    
+    types match {
+      case Nil => TypeRepr.of[Unit]
+      case tpe :: Nil => tpe  // 単一要素の場合はそのまま
+      case _ =>
+        // 複数要素の場合はタプル型を生成
+        val tupleSymbol = Symbol.requiredClass(s"scala.Tuple${types.size}")
+        val appliedType = TypeRepr.of(using tupleSymbol.typeRef.asType).appliedTo(types)
+        appliedType
+    }
+  }
+  
+  // 複数パラメータの抽出結果を組み合わせる関数
+  private def combineParamResults[T: Type](using quotes: Quotes)(
+      results: List[Expr[Option[Any]]]
+  ): Expr[Option[T]] = {
+    import quotes.reflect.*
+    
+    results match {
+      case Nil => '{ Some(().asInstanceOf[T]) }
+      case result :: Nil => '{ $result.asInstanceOf[Option[T]] }
+      case _ =>
+        // Option同士を組み合わせてOption[Tuple]にする
+        val combined = results.reduceLeft { (acc, next) =>
+          '{
+            for {
+              a <- $acc
+              b <- $next
+            } yield (a, b)
+          }
+        }
+        
+        // ネストされたタプルを平坦化する処理
+        if (results.size == 2) {
+          // (a, b) の形式なのでそのまま返す
+          '{ $combined.asInstanceOf[Option[T]] }
+        } else {
+          // ((a, b), c), ... となっているものを (a, b, c, ...) に変換
+          '{
+            $combined.map { tuple =>
+              // 実行時にタプルを平坦化
+              tuple.asInstanceOf[(Any, Any)] match {
+                case (nestedTuple: Product, lastValue) =>
+                  val elements = nestedTuple.productIterator.toSeq :+ lastValue
+                  scala.runtime.Tuples.fromArray(elements.toArray.asInstanceOf[Array[Object]]).asInstanceOf[T]
+              }
+            }
+          }
+        }
+    }
+  }
+  
   private def generateByNameHandler[Res: Type](using quotes: Quotes)(
       func: Expr[PartialFunction[Any, IO[Res]]],
       paramTypes: List[quotes.reflect.TypeRepr],
@@ -56,13 +137,18 @@ object HandlerMacros {
           case JsonRpc.Params.ByName(values) => {
             import io.circe.syntax.*
             
-            type Expected = (String, Int)
+            // TODO: 型のリストが分かればfoldRightしてTuple型を生成できる
+            // (A, B, C) =:= A *: B *: C *: EmptyTuple
+            type Expected = String *: Int *: EmptyTuple
             
+            // TODO: パラメータが分かればDecoderをsummonする式を生成できる。
             val decoderString = summon[Decoder[String]]
             val decoderInt = summon[Decoder[Int]]
             
             val params: Option[Expected] = {
               try {
+                // TODO: 名前と型が分かればfooResultを生成できる。ここを1つの式にできる
+                // TODO: 
                 val aResult = values.get("a").flatMap(_.as[String](decoderString).toOption)
                 val bResult = values.get("b").flatMap(_.as[Int](decoderInt).toOption)
                 
