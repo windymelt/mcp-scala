@@ -126,14 +126,14 @@ object Handler {
     "initialize" -> byNameHandler {
       // PartialFunction の case を使う
       case (
-            capabilities: ClientCapabilities,
+      protocolVersion: String,
+      capabilities: ClientCapabilities,
             clientInfo: Implementation,
-            protocolVersion: String
           ) =>
         handleInitialize(capabilities, clientInfo, protocolVersion)
     },
-    "tools/list" -> byPositionHandler { // byPositionHandler を使う
-      (cursor: Option[String]) => // 通常の関数リテラル
+    "tools/list" -> byPositionHandler {
+      case cursor: Option[String] => // PartialFunctionに変更
         handleListTools(cursor)
     },
     "tools/call" -> byNameHandler {
