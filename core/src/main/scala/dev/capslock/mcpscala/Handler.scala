@@ -30,16 +30,15 @@ object Handler {
   private def handleListTools(tools: Map[String, server.Tool[?]])(
       cursor: Option[String]
   ): IO[ListToolsResult] = {
-    // TODO: cursor を使ったページネーション
+    // TODO: pagenation
     val toolMap: Seq[Tool] = tools.map { case (name, tool) =>
       Tool(
         inputSchema = tool.inputSchema,
         name = name
       )
     }.toSeq
-    val response = ListToolsResult(toolMap)
 
-    IO.pure(response)
+    IO.pure(ListToolsResult(toolMap))
   }
 
   private def handleCallTool(tools: Map[String, server.Tool[?]])(
