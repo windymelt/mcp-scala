@@ -1,7 +1,7 @@
 package dev.capslock.mcpscala.mcp
 
 import io.circe.generic.semiauto
-import io.circe.Codec
+import io.circe.{Codec, Decoder}
 
 enum Method(val methodName: String) {
   case Initialize(
@@ -51,6 +51,9 @@ case class TextContentPart(text: String, `type`: String = "text")
 
 object MethodIsJsonRpc {
   given Codec[Method] = semiauto.deriveCodec
+  given Decoder[Method.Initialize] = semiauto.deriveDecoder
+  given Decoder[Method.ListTools] = semiauto.deriveDecoder
+  given Decoder[Method.CallTool] = semiauto.deriveDecoder
   given Codec[ClientCapabilities] = semiauto.deriveCodec
   given Codec[ServerCapabilities] = semiauto.deriveCodec
   given Codec[Tools] = semiauto.deriveCodec
