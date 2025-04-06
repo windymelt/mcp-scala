@@ -48,8 +48,14 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       "io.circe" %%% "circe-parser"
     ).map(_ % circeVersion),
     libraryDependencies ++= Seq(
-      "co.fs2" %% "fs2-core" % fs2Version,
-      "co.fs2" %% "fs2-io" % fs2Version
+      "co.fs2" %%% "fs2-core" % fs2Version,
+      "co.fs2" %%% "fs2-io" % fs2Version
+    ),
+    libraryDependencies ++= Seq(
+      "com.softwaremill.sttp.tapir" %%% "tapir-core" % "1.11.23",
+      "com.softwaremill.sttp.tapir" %%% "tapir-apispec-docs" % "1.11.23",
+      "com.softwaremill.sttp.apispec" %%% "openapi-circe" % "0.11.7",
+      "com.softwaremill.sttp.apispec" %%% "jsonschema-circe" % "0.11.7"
     ),
     libraryDependencies += "org.scalactic" %%% "scalactic" % "3.2.19",
     libraryDependencies += "org.scalatest" %%% "scalatest" % "3.2.19" % "test",
