@@ -20,33 +20,63 @@ import cats.effect.IO
 import cats.effect.IOApp
 import dev.capslock.mcpscala.transport.StdioServer
 import dev.capslock.mcpscala.mcp.ContentPart
+import sttp.tapir.Schema.annotations.description
 
-case class RandomNumberInput(min: Int, max: Int) derives io.circe.Decoder
+case class RandomNumberInput(
+    @description("Minimum value (inclusive)") min: Int,
+    @description("Maximum value (exclusive)") max: Int
+) derives io.circe.Decoder,
+      sttp.tapir.Schema
 def randomNumber(input: RandomNumberInput): IO[Seq[ContentPart]] = {
   val random = scala.util.Random.between(input.min, input.max)
   IO.pure(Seq(ContentPart.TextContentPart(random.toString)))
 }
 
-/** 標準入出力を使用したJSONRPCサーバーのエントリーポイント
+case class IotaInput(
+    @description("Initial bound") min: Int,
+    @description("Final bound") max: Int
+) derives io.circe.Decoder,
+      sttp.tapir.Schema
+def iota(input: IotaInput): IO[Seq[ContentPart]] = {
+  val iota = (input.min to input.max).map(_.toString)
+  IO.pure(Seq(ContentPart.TextContentPart(iota.mkString(","))))
+}
+
+case class SumInput(
+    xs: Seq[Int]
+) derives io.circe.Decoder,
+      sttp.tapir.Schema
+def sum(input: SumInput): IO[Seq[ContentPart]] = {
+  val sum = input.xs.sum
+  IO.pure(Seq(ContentPart.TextContentPart(sum.toString)))
+}
+
+/** Entry point for the Stdio server.
   */
 object StdioMain extends IOApp.Simple {
   import io.circe.*
   val tools = Map(
-    "randomNumber" -> server.Tool(
-      Json.obj(
-        "type" -> Json.fromString("object"),
-        "properties" -> Json.obj(
-          "min" -> Json.obj("type" -> Json.fromString("number")),
-          "max" -> Json.obj("type" -> Json.fromString("number"))
-        ),
-        "required" -> Json
-          .arr(Json.fromString("min"), Json.fromString("max"))
-      ),
-      (input: RandomNumberInput) =>
+    "randomNumber" -> server.Tool((input: RandomNumberInput) =>
+      IO {
+        val random = scala.util.Random.between(input.min, input.max)
+        Seq(ContentPart.TextContentPart(random.toString))
+      }
+    ),
+    "iota" -> server.Tool(
+      (input: IotaInput) =>
         IO {
-          val random = scala.util.Random.between(input.min, input.max)
-          Seq(ContentPart.TextContentPart(random.toString))
-        }
+          val iota = (input.min to input.max).map(_.toString)
+          Seq(ContentPart.TextContentPart(iota.mkString(",")))
+        },
+      "Generate a sequence of numbers from min to max."
+    ),
+    "sum" -> server.Tool(
+      (input: SumInput) =>
+        IO {
+          val sum = input.xs.sum
+          Seq(ContentPart.TextContentPart(sum.toString))
+        },
+      "Calculate the sum of a sequence of numbers."
     )
   )
   def run: IO[Unit] = {

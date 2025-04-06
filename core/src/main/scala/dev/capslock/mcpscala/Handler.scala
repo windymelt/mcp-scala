@@ -5,6 +5,7 @@ import cats.effect.IO
 import dev.capslock.mcpscala.mcp.*
 import dev.capslock.mcpscala.JsonRpc.Params
 import scala.annotation.experimental
+import dev.capslock.mcpscala.server.JsonSchema.genSchema
 
 object Handler {
   type MethodHandler[F[_]] =
@@ -94,7 +95,8 @@ object Handler {
     // TODO: pagenation
     val toolMap: Seq[Tool] = tools.map { case (name, tool) =>
       Tool(
-        inputSchema = tool.inputSchema,
+        inputSchema =
+          genSchema[tool.Input](using tool.tSchema), // tool.inputSchema,
         name = name,
         description = tool.description
       )
