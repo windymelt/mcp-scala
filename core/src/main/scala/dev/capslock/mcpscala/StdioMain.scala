@@ -32,9 +32,9 @@ case class RandomNumberInput(
     @description("Maximum value (exclusive)") max: Int
 ) derives io.circe.Decoder,
       sttp.tapir.Schema
-def randomNumber(input: RandomNumberInput): IO[Seq[ContentPart]] = {
+def randomNumber(input: RandomNumberInput): IO[Seq[ContentPart]] = IO {
   val random = scala.util.Random.between(input.min, input.max)
-  IO.pure(Seq(ContentPart.TextContentPart(random.toString)))
+  Seq(ContentPart.TextContentPart(random.toString))
 }
 
 case class IotaInput(
@@ -60,26 +60,13 @@ def sum(input: SumInput): IO[Seq[ContentPart]] = {
   */
 object StdioMain extends IOApp.Simple {
   val tools = Map(
-    "randomNumber" -> server.Tool((input: RandomNumberInput) =>
-      IO {
-        val random = scala.util.Random.between(input.min, input.max)
-        Seq(ContentPart.TextContentPart(random.toString))
-      }
-    ),
+    "randomNumber" -> server.Tool(randomNumber),
     "iota" -> server.Tool(
-      (input: IotaInput) =>
-        IO {
-          val iota = (input.min to input.max).map(_.toString)
-          Seq(ContentPart.TextContentPart(iota.mkString(",")))
-        },
+      iota,
       "Generate a sequence of numbers from min to max."
     ),
     "sum" -> server.Tool(
-      (input: SumInput) =>
-        IO {
-          val sum = input.xs.sum
-          Seq(ContentPart.TextContentPart(sum.toString))
-        },
+      sum,
       "Calculate the sum of a sequence of numbers."
     )
   )
