@@ -54,7 +54,6 @@ def sum(input: SumInput): IO[Seq[ContentPart]] = {
 /** Entry point for the Stdio server.
   */
 object StdioMain extends IOApp.Simple {
-  import io.circe.*
   val tools = Map(
     "randomNumber" -> server.Tool((input: RandomNumberInput) =>
       IO {
@@ -79,6 +78,7 @@ object StdioMain extends IOApp.Simple {
       "Calculate the sum of a sequence of numbers."
     )
   )
+
   def run: IO[Unit] = {
     StdioServer.serve(Handler.methodHandlers(tools))
   }
