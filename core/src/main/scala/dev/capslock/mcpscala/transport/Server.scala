@@ -1,5 +1,5 @@
 package dev.capslock.mcpscala
-package web
+package transport
 
 import cats.effect._
 import cats.syntax.all._

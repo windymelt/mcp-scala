@@ -15,7 +15,7 @@
  */
 
 package dev.capslock.mcpscala
-package web
+package transport
 
 import cats.effect._
 import fs2._

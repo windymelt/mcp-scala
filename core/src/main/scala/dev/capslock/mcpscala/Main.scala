@@ -22,7 +22,7 @@ import com.comcast.ip4s._
 import org.http4s.ember.server._
 import org.http4s.implicits._
 import org.http4s.server.Router
-import dev.capslock.mcpscala.web.Server
+import dev.capslock.mcpscala.transport.Server
 
 // object Main extends IOApp.Simple {
 //   val services = Server.jsonRpcService(Handler.methodHandlers)

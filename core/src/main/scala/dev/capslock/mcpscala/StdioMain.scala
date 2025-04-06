@@ -18,7 +18,7 @@ package dev.capslock.mcpscala
 
 import cats.effect.IO
 import cats.effect.IOApp
-import dev.capslock.mcpscala.web.StdioServer
+import dev.capslock.mcpscala.transport.StdioServer
 import dev.capslock.mcpscala.mcp.ContentPart
 
 case class RandomNumberInput(min: Int, max: Int) derives io.circe.Decoder
