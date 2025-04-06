@@ -72,21 +72,17 @@ case class RandomNumberInput(
     @description("Maximum value (exclusive)") max: Int
 ) derives io.circe.Decoder,
       sttp.tapir.Schema
-def randomNumber(input: RandomNumberInput): IO[Seq[ContentPart]] = {
+
+def randomNumber(input: RandomNumberInput): IO[Seq[ContentPart]] = IO {
   val random = scala.util.Random.between(input.min, input.max)
-  IO.pure(Seq(ContentPart.TextContentPart(random.toString)))
+  Seq(ContentPart.TextContentPart(random.toString))
 }
 
 /** Entry point for the Stdio server.
   */
 object StdioMain extends IOApp.Simple {
   val tools = Map(
-    "randomNumber" -> server.Tool((input: RandomNumberInput) =>
-      IO {
-        val random = scala.util.Random.between(input.min, input.max)
-        Seq(ContentPart.TextContentPart(random.toString))
-      }
-    ),
+    "randomNumber" -> server.Tool(randomNumber),
   )
 
   def run: IO[Unit] = {
