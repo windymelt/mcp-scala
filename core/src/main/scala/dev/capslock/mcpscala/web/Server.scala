@@ -15,7 +15,7 @@ object Server {
   import JsonRpc._
   import JsonRpc.Codec.given
 
-  def jsonRpcService(methodHandlers: MethodHandlers = Map.empty) =
+  def jsonRpcService(methodHandlers: MethodHandlers[IO] = Map.empty) =
     HttpRoutes.of[IO] {
       case GET -> Root =>
         Ok("MCP Scala.")
@@ -32,7 +32,7 @@ object Server {
     }
 
   def handleJsonRpcRequest(
-      methodHandlers: MethodHandlers
+      methodHandlers: MethodHandlers[IO]
   )(body: String): IO[String] = {
     parse(body) match {
       case Left(error) =>
@@ -59,7 +59,7 @@ object Server {
   }
 
   def processRequest(
-      methodHandlers: MethodHandlers
+      methodHandlers: MethodHandlers[IO]
   )(request: Request): IO[Response] = {
     request match {
       case call @ Request.Call(_, _, _) =>
@@ -72,7 +72,7 @@ object Server {
   }
 
   private def processCallRequest(
-      methodHandlers: MethodHandlers
+      methodHandlers: MethodHandlers[IO]
   )(call: Request.Call): IO[Response] = {
     val Request.Call(method, params, id) = call
     methodHandlers.get(method) match {
@@ -103,7 +103,7 @@ object Server {
   }
 
   private def processNotificationRequest(
-      methodHandlers: MethodHandlers
+      methodHandlers: MethodHandlers[IO]
   )(notification: Request.Notification): IO[Response] = {
     val Request.Notification(method, params) = notification
     val processEffect = methodHandlers.get(method) match {
@@ -124,7 +124,7 @@ object Server {
   }
 
   private def processBatchRequest(
-      methodHandlers: MethodHandlers
+      methodHandlers: MethodHandlers[IO]
   )(batch: Request.Batch): IO[Response] = {
     val Request.Batch(requests) = batch
     if (requests.isEmpty) {

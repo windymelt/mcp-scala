@@ -2,29 +2,14 @@ package dev.capslock.mcpscala
 
 import io.circe.syntax._
 import cats.effect.IO
-import dev.capslock.mcpscala.JsonRpc // JsonRpc.scala が同じパッケージにあると仮定
 import dev.capslock.mcpscala.mcp.*
-import dev.capslock.mcpscala.macros.HandlerMacros.{
-  byNameHandler
-  // byPositionHandler,
-} // 新しいマクロをインポート
 import dev.capslock.mcpscala.JsonRpc.Params
+import scala.annotation.experimental
 
 object Handler {
-  // MethodHandler と MethodHandlers の型エイリアスはマクロ利用側では不要になるかも
-  type MethodHandler =
-    JsonRpc.Params => IO[Either[JsonRpc.Error, io.circe.Json]]
-  type MethodHandlers = Map[String, MethodHandler]
-
-  trait MethodHandlerContext {
-    type Params
-    type Result
-    def wrapper(x: JsonRpc.Params): IO[Either[String, Result]]
-    def apply(x: Params): IO[Either[String, Result]]
-  }
-  type MethodHandlerContexts = Map[String, MethodHandlerContext]
-
-  // --- ビジネスロジック関数 ---
+  type MethodHandler[F[_]] =
+    JsonRpc.Params => F[Either[JsonRpc.Error, io.circe.Json]]
+  type MethodHandlers[F[_]] = Map[String, MethodHandler[F]]
 
   private def handleInitialize(
       capabilities: ClientCapabilities,
@@ -66,7 +51,6 @@ object Handler {
     IO.pure(response)
   }
 
-  // Circe コーデック (Methods.scala に移動推奨)
   private def handleCallTool(
       name: String,
       arguments: Option[Map[String, io.circe.Json]]
@@ -84,8 +68,9 @@ object Handler {
                   IO.pure(
                     CallToolResult(
                       isError = true,
-                      content =
-                        Seq(TextContentPart("min must be less than max"))
+                      content = Seq(
+                        ContentPart.TextContentPart("min must be less than max")
+                      )
                     )
                   )
                 } else {
@@ -93,7 +78,8 @@ object Handler {
                   IO.pure(
                     CallToolResult(
                       isError = false,
-                      content = Seq(TextContentPart(random.toString))
+                      content =
+                        Seq(ContentPart.TextContentPart(random.toString))
                     )
                   )
                 }
@@ -102,7 +88,7 @@ object Handler {
                   CallToolResult(
                     isError = true,
                     content = Seq(
-                      TextContentPart(
+                      ContentPart.TextContentPart(
                         "min and max arguments are required and must be integers"
                       )
                     )
@@ -114,7 +100,9 @@ object Handler {
               CallToolResult(
                 isError = true,
                 content = Seq(
-                  TextContentPart("arguments are required for randomNumber")
+                  ContentPart.TextContentPart(
+                    "arguments are required for randomNumber"
+                  )
                 )
               )
             )
@@ -123,46 +111,108 @@ object Handler {
         IO.pure(
           CallToolResult(
             isError = true,
-            content = Seq(TextContentPart(s"Tool '$name' not found"))
+            content =
+              Seq(ContentPart.TextContentPart(s"Tool '$name' not found"))
           )
         )
     }
   }
 
-  // --- マクロを使って methodHandlers を生成 ---
-  import MethodIsJsonRpc.given
-  val methodHandlers: MethodHandlers = Map(
-    "initialize" -> { (params: JsonRpc.Params) =>
+  def byNameHandler[F[_]: cats.Applicative, In, Out](
+      func: In => F[Either[String, Out]]
+  )(using io.circe.Decoder[In], io.circe.Encoder[Out]): MethodHandler[F] = {
+    (params: JsonRpc.Params) =>
       params match
         case Params.ByPosition(values) =>
-          // initialize is not defined
-          IO.pure(
+          import cats.syntax.applicative.*
+          Left(
+            JsonRpc.Error(
+              JsonRpc.ErrorCode.MethodNotFound,
+              "Method is not defined for byPosition"
+            )
+          ).pure[F]
+
+        case Params.ByName(values) =>
+          values.asJson.as[In] match
+            case Left(value) =>
+              import cats.syntax.applicative.*
+              Left(
+                JsonRpc.Error(
+                  JsonRpc.ErrorCode.InvalidParams,
+                  "Invalid parameters",
+                  None
+                )
+              ).pure[F]
+            case Right(p) =>
+              import cats.syntax.functor.*
+              func(p) map {
+                case Left(error) =>
+                  Left(
+                    JsonRpc.Error(
+                      JsonRpc.ErrorCode.InvalidParams,
+                      error,
+                      None
+                    )
+                  )
+                case Right(result) =>
+                  Right(result.asJson)
+              }
+  }
+
+  @experimental
+  def byPositionHandler[F[_]: cats.Applicative, In <: Tuple, Out](
+      func: In => F[Either[String, Out]]
+  )(using
+      io.circe.Decoder[In],
+      io.circe.Encoder[Out]
+  ): MethodHandler[F] = { (params: JsonRpc.Params) =>
+    params match
+      case Params.ByPosition(values) =>
+        values.asJson.as[In] match
+          case Left(value) =>
+            import cats.syntax.applicative.*
             Left(
               JsonRpc.Error(
-                JsonRpc.ErrorCode.MethodNotFound,
-                "Method 'initialize' is not defined for byPosition"
+                JsonRpc.ErrorCode.InvalidParams,
+                "Invalid parameters",
+                None
               )
-            )
-          )
-        case Params.ByName(values) =>
-          values.asJson.as[Method.Initialize] match
-            case Left(value) =>
-              IO.pure(
+            ).pure[F]
+          case Right(p) =>
+            // TODO: extract p and pass
+            import cats.syntax.functor.*
+            func(p) map {
+              case Left(error) =>
                 Left(
                   JsonRpc.Error(
                     JsonRpc.ErrorCode.InvalidParams,
-                    "Invalid parameters for 'initialize'",
+                    error,
                     None
                   )
                 )
-              )
-            case Right(p) =>
-              for result <- handleInitialize(
-                  p.capabilities,
-                  p.clientInfo,
-                  p.protocolVersion
-                )
-              yield Right(result.asJson)
+              case Right(result) =>
+                Right(result.asJson)
+            }
+      case Params.ByName(values) =>
+        import cats.syntax.applicative.*
+        Left(
+          JsonRpc.Error(
+            JsonRpc.ErrorCode.MethodNotFound,
+            "Method is not defined for byName"
+          )
+        ).pure[F]
+  }
+
+  import MethodIsJsonRpc.given
+  val methodHandlers: MethodHandlers[IO] = Map(
+    "initialize" -> byNameHandler { (params: Method.Initialize) =>
+      {
+        handleInitialize(
+          params.capabilities,
+          params.clientInfo,
+          params.protocolVersion
+        ).map(x => Right(x))
+      }
     },
     "tools/list" -> { (params: JsonRpc.Params) =>
       params match
@@ -200,39 +250,10 @@ object Handler {
           )
 
     },
-    "tools/call" -> { (params: JsonRpc.Params) =>
-      params match
-        case Params.ByPosition(values) =>
-          // tools/call is not defined
-          IO.pure(
-            Left(
-              JsonRpc.Error(
-                JsonRpc.ErrorCode.MethodNotFound,
-                "Method 'tools/call' is not defined for byPosition"
-              )
-            )
-          )
-        case Params.ByName(values) =>
-          values.asJson.as[Method.CallTool] match
-            case Left(value) =>
-              IO.pure(
-                Left(
-                  JsonRpc.Error(
-                    JsonRpc.ErrorCode.InvalidParams,
-                    "Invalid parameters for 'tools/call'",
-                    None
-                  )
-                )
-              )
-            case Right(p) =>
-              for result <- handleCallTool(
-                  p.name,
-                  p.arguments
-                )
-              yield Right(result.asJson)
+    "tools/call" -> {
+      byNameHandler { (params: Method.CallTool) =>
+        handleCallTool(params.name, params.arguments).map(x => Right(x))
+      }
     }
-    // 他のハンドラも同様に追加
   )
-
-  // 古いエラーヘルパーと Map 定義は削除
 }

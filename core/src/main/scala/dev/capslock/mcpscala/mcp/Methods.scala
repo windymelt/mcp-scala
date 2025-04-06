@@ -1,7 +1,9 @@
 package dev.capslock.mcpscala.mcp
 
 import io.circe.generic.semiauto
-import io.circe.{Codec, Decoder}
+import io.circe.{Codec, Decoder, Encoder}
+import io.circe.derivation.Configuration
+import io.circe.derivation.ConfiguredEncoder
 
 enum Method(val methodName: String) {
   case Initialize(
@@ -45,9 +47,18 @@ case class Tool(
     name: String
 )
 case class CallToolResult(isError: Boolean, content: Seq[ContentPart])
-sealed trait ContentPart
-case class TextContentPart(text: String, `type`: String = "text")
-    extends ContentPart
+    derives Encoder
+
+object ContentPart {
+  given Configuration = Configuration.default
+    .withDiscriminator("type")
+    .withTransformConstructorNames { case "TextContentPart" =>
+      "text"
+    }
+}
+enum ContentPart derives ConfiguredEncoder {
+  case TextContentPart(text: String, `type`: "text" = "text")
+}
 
 object MethodIsJsonRpc {
   given Codec[Method] = semiauto.deriveCodec
@@ -61,8 +72,6 @@ object MethodIsJsonRpc {
   given Codec[InitializeResult] = semiauto.deriveCodec
   given Codec[ListToolsResult] = semiauto.deriveCodec
   given Codec[Tool] = semiauto.deriveCodec
-  given Codec[CallToolResult] = semiauto.deriveCodec
-  given Codec[ContentPart] = semiauto.deriveCodec
 
   extension (methodJson: io.circe.Json)
     def asMessage: Either[io.circe.DecodingFailure, Method] =

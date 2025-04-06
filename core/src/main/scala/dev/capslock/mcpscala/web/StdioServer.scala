@@ -32,7 +32,7 @@ object StdioServer {
     * @return
     *   実行完了を表すIO
     */
-  def serve(methodHandlers: MethodHandlers): IO[Unit] = {
+  def serve(methodHandlers: MethodHandlers[IO]): IO[Unit] = {
     // 標準入力からリクエストを読み込み処理し、標準出力にレスポンスを書き込むパイプライン
     stdin[IO](4096)
       .through(text.utf8.decode)
