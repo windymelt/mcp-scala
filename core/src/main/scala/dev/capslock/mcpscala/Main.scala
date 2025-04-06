@@ -24,15 +24,15 @@ import org.http4s.implicits._
 import org.http4s.server.Router
 import dev.capslock.mcpscala.web.Server
 
-object Main extends IOApp.Simple {
-  val services = Server.jsonRpcService(Handler.methodHandlers)
-  val httpApp = Router("/" -> services).orNotFound
-  val server = EmberServerBuilder
-    .default[IO]
-    .withHost(ipv4"0.0.0.0")
-    .withPort(port"8080")
-    .withHttpApp(httpApp)
-    .build
-  def run: IO[Unit] =
-    server.useForever
-}
+// object Main extends IOApp.Simple {
+//   val services = Server.jsonRpcService(Handler.methodHandlers)
+//   val httpApp = Router("/" -> services).orNotFound
+//   val server = EmberServerBuilder
+//     .default[IO]
+//     .withHost(ipv4"0.0.0.0")
+//     .withPort(port"8080")
+//     .withHttpApp(httpApp)
+//     .build
+//   def run: IO[Unit] =
+//     server.useForever
+// }

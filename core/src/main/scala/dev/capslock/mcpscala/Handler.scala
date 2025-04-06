@@ -27,95 +27,56 @@ object Handler {
     IO.pure(response)
   }
 
-  private def handleListTools(
+  private def handleListTools(tools: Map[String, server.Tool[?]])(
       cursor: Option[String]
   ): IO[ListToolsResult] = {
     // TODO: cursor を使ったページネーション
-    import io.circe.Json
-    val response = ListToolsResult(
-      List(
-        Tool(
-          inputSchema = Json.obj(
-            "type" -> Json.fromString("object"),
-            "properties" -> Json.obj(
-              "min" -> Json.obj("type" -> Json.fromString("number")),
-              "max" -> Json.obj("type" -> Json.fromString("number"))
-            ),
-            "required" -> Json
-              .arr(Json.fromString("min"), Json.fromString("max"))
-          ),
-          name = "randomNumber"
-        )
+    val toolMap: Seq[Tool] = tools.map { case (name, tool) =>
+      Tool(
+        inputSchema = tool.inputSchema,
+        name = name
       )
-    )
+    }.toSeq
+    val response = ListToolsResult(toolMap)
+
     IO.pure(response)
   }
 
-  private def handleCallTool(
+  private def handleCallTool(tools: Map[String, server.Tool[?]])(
       name: String,
       arguments: Option[Map[String, io.circe.Json]]
   ): IO[CallToolResult] = {
-    name match {
-      case "randomNumber" =>
-        arguments match {
-          case Some(args) =>
-            val minResult = args.get("min").flatMap(_.as[Int].toOption)
-            val maxResult = args.get("max").flatMap(_.as[Int].toOption)
-
-            (minResult, maxResult) match {
-              case (Some(min), Some(max)) =>
-                if (min >= max) {
-                  IO.pure(
-                    CallToolResult(
-                      isError = true,
-                      content = Seq(
-                        ContentPart.TextContentPart("min must be less than max")
-                      )
-                    )
-                  )
-                } else {
-                  val random = scala.util.Random.between(min, max)
-                  IO.pure(
-                    CallToolResult(
-                      isError = false,
-                      content =
-                        Seq(ContentPart.TextContentPart(random.toString))
-                    )
-                  )
-                }
-              case _ =>
-                IO.pure(
-                  CallToolResult(
-                    isError = true,
-                    content = Seq(
-                      ContentPart.TextContentPart(
-                        "min and max arguments are required and must be integers"
-                      )
-                    )
-                  )
-                )
-            }
-          case None =>
+    val tool = tools.get(name)
+    tool match
+      case None =>
+        IO.pure(
+          CallToolResult(
+            isError = true,
+            content = Seq(
+              ContentPart.TextContentPart(s"Tool '$name' not found")
+            )
+          )
+        )
+      case Some(t) => {
+        given io.circe.Decoder[t.Input] = t.inputDecoder
+        val parsedInput = arguments.asJson.as[t.Input]
+        parsedInput match
+          case Left(value) =>
             IO.pure(
               CallToolResult(
                 isError = true,
                 content = Seq(
                   ContentPart.TextContentPart(
-                    "arguments are required for randomNumber"
+                    s"Parameter parse failed: Invalid parameters for tool '$name': ${value.message}"
                   )
                 )
               )
             )
-        }
-      case _ =>
-        IO.pure(
-          CallToolResult(
-            isError = true,
-            content =
-              Seq(ContentPart.TextContentPart(s"Tool '$name' not found"))
-          )
-        )
-    }
+          case Right(input) =>
+            t.func(input).map { result =>
+              CallToolResult(isError = false, content = result)
+            }
+      }
   }
 
   def byNameHandler[F[_]: cats.Applicative, In, Out](
@@ -204,56 +165,59 @@ object Handler {
   }
 
   import MethodIsJsonRpc.given
-  val methodHandlers: MethodHandlers[IO] = Map(
-    "initialize" -> byNameHandler { (params: Method.Initialize) =>
-      {
-        handleInitialize(
-          params.capabilities,
-          params.clientInfo,
-          params.protocolVersion
-        ).map(x => Right(x))
-      }
-    },
-    "tools/list" -> { (params: JsonRpc.Params) =>
-      params match
-        case Params.ByPosition(values) =>
-          values.size match
-            case 0 =>
-              for result <- handleListTools(None)
-              yield Right(result.asJson)
-            case _ =>
-              values.head.as[Method.ListTools] match
-                case Left(value) =>
-                  IO.pure(
-                    Left(
-                      JsonRpc.Error(
-                        JsonRpc.ErrorCode.InvalidParams,
-                        "Invalid parameters for 'tools/list'",
-                        None
+  def methodHandlers(tools: Map[String, server.Tool[?]]): MethodHandlers[IO] =
+    Map(
+      "initialize" -> byNameHandler { (params: Method.Initialize) =>
+        {
+          handleInitialize(
+            params.capabilities,
+            params.clientInfo,
+            params.protocolVersion
+          ).map(x => Right(x))
+        }
+      },
+      "tools/list" -> { (params: JsonRpc.Params) =>
+        params match
+          case Params.ByPosition(values) =>
+            values.size match
+              case 0 =>
+                for result <- handleListTools(tools)(None)
+                yield Right(result.asJson)
+              case _ =>
+                values.head.as[Method.ListTools] match
+                  case Left(value) =>
+                    IO.pure(
+                      Left(
+                        JsonRpc.Error(
+                          JsonRpc.ErrorCode.InvalidParams,
+                          "Invalid parameters for 'tools/list'",
+                          None
+                        )
                       )
                     )
-                  )
-                case Right(p) =>
-                  for result <- handleListTools(
-                      p.cursor
-                    )
-                  yield Right(result.asJson)
+                  case Right(p) =>
+                    for result <- handleListTools(tools)(
+                        p.cursor
+                      )
+                    yield Right(result.asJson)
 
-        case Params.ByName(values) =>
-          IO.pure(
-            Left(
-              JsonRpc.Error(
-                JsonRpc.ErrorCode.MethodNotFound,
-                "Method 'tools/list' is not defined for byPosition"
+          case Params.ByName(values) =>
+            IO.pure(
+              Left(
+                JsonRpc.Error(
+                  JsonRpc.ErrorCode.MethodNotFound,
+                  "Method 'tools/list' is not defined for byPosition"
+                )
               )
             )
-          )
 
-    },
-    "tools/call" -> {
-      byNameHandler { (params: Method.CallTool) =>
-        handleCallTool(params.name, params.arguments).map(x => Right(x))
+      },
+      "tools/call" -> {
+        byNameHandler { (params: Method.CallTool) =>
+          handleCallTool(tools)(params.name, params.arguments).map(x =>
+            Right(x)
+          )
+        }
       }
-    }
-  )
+    )
 }

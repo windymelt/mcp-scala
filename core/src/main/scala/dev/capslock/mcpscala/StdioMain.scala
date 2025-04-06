@@ -19,12 +19,38 @@ package dev.capslock.mcpscala
 import cats.effect.IO
 import cats.effect.IOApp
 import dev.capslock.mcpscala.web.StdioServer
+import dev.capslock.mcpscala.mcp.ContentPart
+
+case class RandomNumberInput(min: Int, max: Int) derives io.circe.Decoder
+def randomNumber(input: RandomNumberInput): IO[Seq[ContentPart]] = {
+  val random = scala.util.Random.between(input.min, input.max)
+  IO.pure(Seq(ContentPart.TextContentPart(random.toString)))
+}
 
 /** 標準入出力を使用したJSONRPCサーバーのエントリーポイント
   */
 object StdioMain extends IOApp.Simple {
-  // StdioServerを使用してサーバーを起動
+  import io.circe.*
+  val tools = Map(
+    "randomNumber" -> server.Tool(
+      "randomNumber",
+      Json.obj(
+        "type" -> Json.fromString("object"),
+        "properties" -> Json.obj(
+          "min" -> Json.obj("type" -> Json.fromString("number")),
+          "max" -> Json.obj("type" -> Json.fromString("number"))
+        ),
+        "required" -> Json
+          .arr(Json.fromString("min"), Json.fromString("max"))
+      ),
+      (input: RandomNumberInput) =>
+        IO {
+          val random = scala.util.Random.between(input.min, input.max)
+          Seq(ContentPart.TextContentPart(random.toString))
+        }
+    )
+  )
   def run: IO[Unit] = {
-    StdioServer.serve(Handler.methodHandlers)
+    StdioServer.serve(Handler.methodHandlers(tools))
   }
 }
