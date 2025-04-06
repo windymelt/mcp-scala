@@ -33,7 +33,6 @@ object StdioMain extends IOApp.Simple {
   import io.circe.*
   val tools = Map(
     "randomNumber" -> server.Tool(
-      "randomNumber",
       Json.obj(
         "type" -> Json.fromString("object"),
         "properties" -> Json.obj(
