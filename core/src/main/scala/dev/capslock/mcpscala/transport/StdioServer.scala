@@ -25,20 +25,13 @@ import Handler.MethodHandlers
 
 object StdioServer {
 
-  /** サーバーを起動し、標準入出力でJSONRPCリクエストを処理する
-    *
-    * @param methodHandlers
-    *   登録するメソッドハンドラー
-    * @return
-    *   実行完了を表すIO
+  /** Provide a JSON-RPC server using standard input and output.
     */
   def serve(methodHandlers: MethodHandlers[IO]): IO[Unit] = {
-    // 標準入力からリクエストを読み込み処理し、標準出力にレスポンスを書き込むパイプライン
     stdin[IO](4096)
       .through(text.utf8.decode)
       .through(text.lines)
       .evalMap(Server.handleJsonRpcRequest(methodHandlers))
-      // 改行付きでレスポンスを出力
       .map(result => s"$result\n")
       .through(text.utf8.encode)
       .through(stdout[IO])

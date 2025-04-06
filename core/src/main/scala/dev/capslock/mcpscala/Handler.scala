@@ -11,160 +11,9 @@ object Handler {
     JsonRpc.Params => F[Either[JsonRpc.Error, io.circe.Json]]
   type MethodHandlers[F[_]] = Map[String, MethodHandler[F]]
 
-  private def handleInitialize(
-      capabilities: ClientCapabilities,
-      clientInfo: Implementation,
-      protocolVersion: String
-  ): IO[InitializeResult] = {
-    val response = InitializeResult(
-      ServerCapabilities(
-        tools = Some(Tools()) // TODO: 実際のツール情報
-      ),
-      Some("This server is still under development"),
-      protocolVersion,
-      Implementation("MCP Scala", "0.1.0")
-    )
-    IO.pure(response)
-  }
+  def methodHandlers(tools: Map[String, server.Tool[?]]): MethodHandlers[IO] = {
+    import MethodIsJsonRpc.given
 
-  private def handleListTools(tools: Map[String, server.Tool[?]])(
-      cursor: Option[String]
-  ): IO[ListToolsResult] = {
-    // TODO: pagenation
-    val toolMap: Seq[Tool] = tools.map { case (name, tool) =>
-      Tool(
-        inputSchema = tool.inputSchema,
-        name = name
-      )
-    }.toSeq
-
-    IO.pure(ListToolsResult(toolMap))
-  }
-
-  private def handleCallTool(tools: Map[String, server.Tool[?]])(
-      name: String,
-      arguments: Option[Map[String, io.circe.Json]]
-  ): IO[CallToolResult] = {
-    val tool = tools.get(name)
-    tool match
-      case None =>
-        IO.pure(
-          CallToolResult(
-            isError = true,
-            content = Seq(
-              ContentPart.TextContentPart(s"Tool '$name' not found")
-            )
-          )
-        )
-      case Some(t) => {
-        given io.circe.Decoder[t.Input] = t.inputDecoder
-        val parsedInput = arguments.asJson.as[t.Input]
-        parsedInput match
-          case Left(value) =>
-            IO.pure(
-              CallToolResult(
-                isError = true,
-                content = Seq(
-                  ContentPart.TextContentPart(
-                    s"Parameter parse failed: Invalid parameters for tool '$name': ${value.message}"
-                  )
-                )
-              )
-            )
-          case Right(input) =>
-            t.func(input).map { result =>
-              CallToolResult(isError = false, content = result)
-            }
-      }
-  }
-
-  def byNameHandler[F[_]: cats.Applicative, In, Out](
-      func: In => F[Either[String, Out]]
-  )(using io.circe.Decoder[In], io.circe.Encoder[Out]): MethodHandler[F] = {
-    (params: JsonRpc.Params) =>
-      params match
-        case Params.ByPosition(values) =>
-          import cats.syntax.applicative.*
-          Left(
-            JsonRpc.Error(
-              JsonRpc.ErrorCode.MethodNotFound,
-              "Method is not defined for byPosition"
-            )
-          ).pure[F]
-
-        case Params.ByName(values) =>
-          values.asJson.as[In] match
-            case Left(value) =>
-              import cats.syntax.applicative.*
-              Left(
-                JsonRpc.Error(
-                  JsonRpc.ErrorCode.InvalidParams,
-                  "Invalid parameters",
-                  None
-                )
-              ).pure[F]
-            case Right(p) =>
-              import cats.syntax.functor.*
-              func(p) map {
-                case Left(error) =>
-                  Left(
-                    JsonRpc.Error(
-                      JsonRpc.ErrorCode.InvalidParams,
-                      error,
-                      None
-                    )
-                  )
-                case Right(result) =>
-                  Right(result.asJson)
-              }
-  }
-
-  @experimental
-  def byPositionHandler[F[_]: cats.Applicative, In <: Tuple, Out](
-      func: In => F[Either[String, Out]]
-  )(using
-      io.circe.Decoder[In],
-      io.circe.Encoder[Out]
-  ): MethodHandler[F] = { (params: JsonRpc.Params) =>
-    params match
-      case Params.ByPosition(values) =>
-        values.asJson.as[In] match
-          case Left(value) =>
-            import cats.syntax.applicative.*
-            Left(
-              JsonRpc.Error(
-                JsonRpc.ErrorCode.InvalidParams,
-                "Invalid parameters",
-                None
-              )
-            ).pure[F]
-          case Right(p) =>
-            // TODO: extract p and pass
-            import cats.syntax.functor.*
-            func(p) map {
-              case Left(error) =>
-                Left(
-                  JsonRpc.Error(
-                    JsonRpc.ErrorCode.InvalidParams,
-                    error,
-                    None
-                  )
-                )
-              case Right(result) =>
-                Right(result.asJson)
-            }
-      case Params.ByName(values) =>
-        import cats.syntax.applicative.*
-        Left(
-          JsonRpc.Error(
-            JsonRpc.ErrorCode.MethodNotFound,
-            "Method is not defined for byName"
-          )
-        ).pure[F]
-  }
-
-  import MethodIsJsonRpc.given
-  def methodHandlers(tools: Map[String, server.Tool[?]]): MethodHandlers[IO] =
     Map(
       "initialize" -> byNameHandler { (params: Method.Initialize) =>
         {
@@ -219,4 +68,160 @@ object Handler {
         }
       }
     )
+  }
+
+  // private
+
+  private def handleInitialize(
+      capabilities: ClientCapabilities,
+      clientInfo: Implementation,
+      protocolVersion: String
+  ): IO[InitializeResult] = {
+    val response = InitializeResult(
+      ServerCapabilities(
+        tools = Some(Tools()) // TODO: 実際のツール情報
+      ),
+      Some("This server is still under development"),
+      protocolVersion,
+      Implementation("MCP Scala", "0.1.0")
+    )
+    IO.pure(response)
+  }
+
+  private def handleListTools(tools: Map[String, server.Tool[?]])(
+      cursor: Option[String]
+  ): IO[ListToolsResult] = {
+    // TODO: pagenation
+    val toolMap: Seq[Tool] = tools.map { case (name, tool) =>
+      Tool(
+        inputSchema = tool.inputSchema,
+        name = name,
+        description = tool.description
+      )
+    }.toSeq
+
+    IO.pure(ListToolsResult(toolMap))
+  }
+
+  private def handleCallTool(tools: Map[String, server.Tool[?]])(
+      name: String,
+      arguments: Option[Map[String, io.circe.Json]]
+  ): IO[CallToolResult] = {
+    val tool = tools.get(name)
+    tool match
+      case None =>
+        IO.pure(
+          CallToolResult(
+            isError = true,
+            content = Seq(
+              ContentPart.TextContentPart(s"Tool '$name' not found")
+            )
+          )
+        )
+      case Some(t) => {
+        given io.circe.Decoder[t.Input] = t.inputDecoder
+        val parsedInput = arguments.asJson.as[t.Input]
+        parsedInput match
+          case Left(value) =>
+            IO.pure(
+              CallToolResult(
+                isError = true,
+                content = Seq(
+                  ContentPart.TextContentPart(
+                    s"Parameter parse failed: Invalid parameters for tool '$name': ${value.message}"
+                  )
+                )
+              )
+            )
+          case Right(input) =>
+            t.func(input).map { result =>
+              CallToolResult(isError = false, content = result)
+            }
+      }
+  }
+
+  private def byNameHandler[F[_]: cats.Applicative, In, Out](
+      func: In => F[Either[String, Out]]
+  )(using io.circe.Decoder[In], io.circe.Encoder[Out]): MethodHandler[F] = {
+    (params: JsonRpc.Params) =>
+      params match
+        case Params.ByPosition(values) =>
+          import cats.syntax.applicative.*
+          Left(
+            JsonRpc.Error(
+              JsonRpc.ErrorCode.MethodNotFound,
+              "Method is not defined for byPosition"
+            )
+          ).pure[F]
+
+        case Params.ByName(values) =>
+          values.asJson.as[In] match
+            case Left(value) =>
+              import cats.syntax.applicative.*
+              Left(
+                JsonRpc.Error(
+                  JsonRpc.ErrorCode.InvalidParams,
+                  "Invalid parameters",
+                  None
+                )
+              ).pure[F]
+            case Right(p) =>
+              import cats.syntax.functor.*
+              func(p) map {
+                case Left(error) =>
+                  Left(
+                    JsonRpc.Error(
+                      JsonRpc.ErrorCode.InvalidParams,
+                      error,
+                      None
+                    )
+                  )
+                case Right(result) =>
+                  Right(result.asJson)
+              }
+  }
+
+  @experimental
+  private def byPositionHandler[F[_]: cats.Applicative, In <: Tuple, Out](
+      func: In => F[Either[String, Out]]
+  )(using
+      io.circe.Decoder[In],
+      io.circe.Encoder[Out]
+  ): MethodHandler[F] = { (params: JsonRpc.Params) =>
+    params match
+      case Params.ByPosition(values) =>
+        values.asJson.as[In] match
+          case Left(value) =>
+            import cats.syntax.applicative.*
+            Left(
+              JsonRpc.Error(
+                JsonRpc.ErrorCode.InvalidParams,
+                "Invalid parameters",
+                None
+              )
+            ).pure[F]
+          case Right(p) =>
+            // TODO: extract p and pass
+            import cats.syntax.functor.*
+            func(p) map {
+              case Left(error) =>
+                Left(
+                  JsonRpc.Error(
+                    JsonRpc.ErrorCode.InvalidParams,
+                    error,
+                    None
+                  )
+                )
+              case Right(result) =>
+                Right(result.asJson)
+            }
+      case Params.ByName(values) =>
+        import cats.syntax.applicative.*
+        Left(
+          JsonRpc.Error(
+            JsonRpc.ErrorCode.MethodNotFound,
+            "Method is not defined for byName"
+          )
+        ).pure[F]
+  }
 }

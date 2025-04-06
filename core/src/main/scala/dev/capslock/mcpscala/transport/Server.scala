@@ -6,34 +6,17 @@ import cats.syntax.all._
 import io.circe._
 import io.circe.parser._
 import io.circe.syntax._
-import org.http4s._
-import org.http4s.dsl.io._
-import org.http4s.headers.`Content-Type`
 import Handler.MethodHandlers
 
 object Server {
+  // to remove ambiguity, placing this import here
   import JsonRpc._
-  import JsonRpc.Codec.given
-
-  def jsonRpcService(methodHandlers: MethodHandlers[IO] = Map.empty) =
-    HttpRoutes.of[IO] {
-      case GET -> Root =>
-        Ok("MCP Scala.")
-      case req @ POST -> Root / "rpc" =>
-        req.as[String].flatMap { body =>
-          IO.println(body) >> handleJsonRpcRequest(methodHandlers)(body)
-            .flatMap { response =>
-              Ok(response)
-                .map(
-                  _.withContentType(`Content-Type`(MediaType.application.json))
-                )
-            }
-        }
-    }
 
   def handleJsonRpcRequest(
       methodHandlers: MethodHandlers[IO]
   )(body: String): IO[String] = {
+    import JsonRpc.Codec.given
+
     parse(body) match {
       case Left(error) =>
         val response: Response = Response.Failure(

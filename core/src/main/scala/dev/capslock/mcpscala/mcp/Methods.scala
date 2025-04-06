@@ -44,7 +44,8 @@ case class ListToolsResult(
 )
 case class Tool(
     inputSchema: io.circe.Json, // wip
-    name: String
+    name: String,
+    description: String
 )
 case class CallToolResult(isError: Boolean, content: Seq[ContentPart])
     derives Encoder
