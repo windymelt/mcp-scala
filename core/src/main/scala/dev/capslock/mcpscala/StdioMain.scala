@@ -60,7 +60,9 @@ def sum(input: SumInput): IO[Seq[ContentPart]] = {
   */
 object StdioMain extends IOApp.Simple {
   val tools = Map(
-    "randomNumber" -> server.Tool(randomNumber),
+    "ping" -> server
+      .Tool(() => Seq(ContentPart.TextContentPart("pong")), "Ping the server."),
+    "randomNumber" -> server.Tool(randomNumber, "Generate a random number."),
     "iota" -> server.Tool(
       iota,
       "Generate a sequence of numbers from min to max."

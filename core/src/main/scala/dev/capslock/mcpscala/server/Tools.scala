@@ -25,12 +25,38 @@ import cats.effect.IO
 import dev.capslock.mcpscala.mcp.ContentPart
 import io.circe.Decoder
 import sttp.tapir.Schema
+import scala.annotation.targetName
 
 object Tools {}
 
 case class Tool[In](
     func: In => IO[Seq[ContentPart]],
-    description: String = "(not provided)"
+    description: String
 )(using val inputDecoder: Decoder[In], val tSchema: Schema[In]) {
   type Input = In
+}
+
+object Tool {
+  @targetName("pureApply")
+  def apply[In](
+      func: In => Seq[ContentPart],
+      description: String
+  )(using Decoder[In], Schema[In]): Tool[In] = {
+    new Tool[In](in => IO.pure(func(in)), description)
+  }
+
+  def apply(
+      func: () => IO[Seq[ContentPart]],
+      description: String
+  ): Tool[Unit] = {
+    new Tool[Unit](_ => func(), description)
+  }
+
+  @targetName("pureApplyUnit")
+  def apply(
+      func: () => Seq[ContentPart],
+      description: String
+  ): Tool[Unit] = {
+    new Tool[Unit](_ => IO.pure(func()), description)
+  }
 }
