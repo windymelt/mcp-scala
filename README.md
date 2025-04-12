@@ -59,6 +59,10 @@ You can run some tool:
 See `StdioMain.scala` for details.
 
 ```scala
+//> using scala 3
+//> using toolkit typelevel:default
+//> using dep dev.capslock::mcpscala:0.1.0
+
 package dev.capslock.mcpscala
 
 import cats.effect.IO
@@ -80,13 +84,15 @@ def randomNumber(input: RandomNumberInput): IO[Seq[ContentPart]] = IO {
 
 /** Entry point for the Stdio server.
   */
-object StdioMain extends IOApp.Simple {
-  val tools = Map(
-    "randomNumber" -> server.Tool(randomNumber),
+object StdioMain extends McpIOApp(
+    name = "random-number",
+    header = "Generate a random number",
+  ):
+    
+  val handlers = Handler.methodHandlers(
+    Map(
+      "randomNumber" -> server.Tool(randomNumber),
+    )
   )
 
-  def run: IO[Unit] = {
-    StdioServer.serve(Handler.methodHandlers(tools))
-  }
-}
 ```

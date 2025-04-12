@@ -10,9 +10,6 @@ ThisBuild / developers := List(
   tlGitHubDev("windymelt", "windymelt")
 )
 
-// publish to s01.oss.sonatype.org (set to true to publish to oss.sonatype.org instead)
-ThisBuild / tlSonatypeUseLegacyHost := false
-
 // publish website from this branch
 ThisBuild / tlSitePublishBranch := Some("main")
 
@@ -33,9 +30,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
     name := "mcp-scala",
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "cats-core" % "2.13.0",
-      "org.typelevel" %%% "cats-effect" % "3.6.0",
-      "org.scalameta" %%% "munit" % "1.1.0" % Test,
-      "org.typelevel" %%% "munit-cats-effect" % "2.1.0" % Test
+      "org.typelevel" %%% "cats-effect" % "3.6.0"
     ),
     libraryDependencies ++= Seq(
       "org.http4s" %%% "http4s-ember-client" % http4sVersion,
@@ -57,11 +52,24 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       "com.softwaremill.sttp.apispec" %%% "openapi-circe" % "0.11.7",
       "com.softwaremill.sttp.apispec" %%% "jsonschema-circe" % "0.11.7"
     ),
+    libraryDependencies ++= Seq(
+      "com.monovore" %% "decline" % "2.5.0",
+      "com.monovore" %% "decline-effect" % "2.5.0"
+    ),
     libraryDependencies += "org.scalactic" %%% "scalactic" % "3.2.19",
-    libraryDependencies += "org.scalatest" %%% "scalatest" % "3.2.19" % "test",
+    libraryDependencies ++= Seq(
+      "org.scalatest" %%% "scalatest" % "3.2.19" % "test",
+      "org.typelevel" %%% "cats-effect-testing-scalatest" % "1.6.0" % "test"
+    ),
     scalaJSUseMainModuleInitializer := true,
-    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) },
-    Compile / mainClass := Some("dev.capslock.mcpscala.StdioMain")
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
 
 lazy val docs = project.in(file("site")).enablePlugins(TypelevelSitePlugin)
+
+lazy val example = project
+  .in(file("example"))
+  .dependsOn(core.jvm)
+  .settings(
+    name := "example"
+  )
