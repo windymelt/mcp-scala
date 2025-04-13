@@ -24,7 +24,7 @@ val circeVersion = "0.14.12"
 val fs2Version = "3.12.0"
 
 lazy val core = crossProject(JVMPlatform, JSPlatform)
-  .crossType(CrossType.Pure)
+  .crossType(CrossType.Full)
   .in(file("core"))
   .settings(
     name := "mcp-scala",
@@ -53,23 +53,27 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
       "com.softwaremill.sttp.apispec" %%% "jsonschema-circe" % "0.11.7"
     ),
     libraryDependencies ++= Seq(
-      "com.monovore" %% "decline" % "2.5.0",
-      "com.monovore" %% "decline-effect" % "2.5.0"
+      "com.monovore" %%% "decline" % "2.5.0",
+      "com.monovore" %%% "decline-effect" % "2.5.0"
     ),
     libraryDependencies += "org.scalactic" %%% "scalactic" % "3.2.19",
     libraryDependencies ++= Seq(
       "org.scalatest" %%% "scalatest" % "3.2.19" % "test",
       "org.typelevel" %%% "cats-effect-testing-scalatest" % "1.6.0" % "test"
-    ),
-    scalaJSUseMainModuleInitializer := true,
-    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
+    )
   )
-
-lazy val docs = project.in(file("site")).enablePlugins(TypelevelSitePlugin)
+  .jsSettings(
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) }
+  )
 
 lazy val example = project
   .in(file("example"))
-  .dependsOn(core.jvm)
+  .enablePlugins(ScalaJSPlugin)
+  .dependsOn(core.js)
   .settings(
-    name := "example"
+    name := "example",
+    scalaJSUseMainModuleInitializer := true,
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) }
   )
+
+lazy val docs = project.in(file("site")).enablePlugins(TypelevelSitePlugin)

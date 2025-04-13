@@ -3,9 +3,9 @@ package example
 import cats.effect.IO
 import dev.capslock.mcpscala.mcp.ContentPart
 import dev.capslock.mcpscala.McpIOApp
-import sttp.tapir.Schema.annotations.description
 import dev.capslock.mcpscala.Handler
 import dev.capslock.mcpscala.server.Tool
+import sttp.tapir.Schema.annotations.description
 
 case class RandomNumberInput(
     @description("Minimum value (inclusive)") min: Int,
@@ -38,8 +38,8 @@ def sum(input: SumInput): IO[Seq[ContentPart]] = {
 
 object Main
     extends McpIOApp(
-      name = "mcp-stdio-example",
-      header = "MCP Stdio Example",
+      name = "mcp-scala-example",
+      header = "MCP Scala Example",
       version = None
     ):
   def handlers = Handler.methodHandlers(

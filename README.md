@@ -25,7 +25,7 @@ Feel free to open Issue / PR to contribute this project.
 First, build server into JS:
 
 ```sh
-sbt fastLinkJS
+sbt example/fastLinkJS
 ```
 
 Then, utilize server in your MCP client:
@@ -56,7 +56,7 @@ You can run some tool:
 
 ## Implement your tool
 
-See `StdioMain.scala` for details.
+See `Main.scala` for details.
 
 ```scala
 //> using scala 3
