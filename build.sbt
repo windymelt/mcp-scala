@@ -99,7 +99,7 @@ ThisBuild / githubWorkflowJobSetup ++= Seq(
   WorkflowStep.Use(
     UseRef.Public("actions", "setup-node", "v3"),
     name = Some("Setup NodeJS v23"),
-    params = Map("node-version" -> "23", "cache" -> "npm")
+    params = Map("node-version" -> "23")
   )
 )
 

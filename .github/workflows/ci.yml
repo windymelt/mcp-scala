@@ -59,7 +59,6 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 23
-          cache: npm
 
       - name: Check that workflows are up to date
         run: sbt githubWorkflowCheck
@@ -137,7 +136,6 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 23
-          cache: npm
 
       - name: Download target directories (3.6.3, rootJS)
         uses: actions/download-artifact@v4
@@ -237,7 +235,6 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 23
-          cache: npm
 
       - name: Submit Dependencies
         uses: scalacenter/sbt-dependency-submission@v2
@@ -278,7 +275,6 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 23
-          cache: npm
 
       - name: Setup Java (temurin@11)
         id: setup-java-temurin-11
