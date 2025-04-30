@@ -25,6 +25,7 @@ import cats.effect.IO
 import dev.capslock.mcpscala.mcp.ContentPart
 import io.circe.Decoder
 import sttp.tapir.Schema
+
 import scala.annotation.targetName
 
 object Tools {}

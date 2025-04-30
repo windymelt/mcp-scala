@@ -24,15 +24,16 @@ package web
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
-import io.circe._
+import io.circe.*
+
 import Handler.MethodHandlers
 
 class ServerSpec extends BaseSpec:
   import JsonRpc._
-  import Server._
+  import dev.capslock.mcpscala.transport.Server._
 
   describe("processRequest") {
-    val testMethodHandlers: MethodHandlers = Map(
+    val testMethodHandlers: MethodHandlers[IO] = Map(
       "echo" -> { params =>
         IO.pure(
           params match {

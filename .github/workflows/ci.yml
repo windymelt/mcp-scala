@@ -28,7 +28,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-22.04]
-        scala: [2.13, 3]
+        scala: [3.6.3, 3.3.5]
         java: [temurin@8]
         project: [rootJS, rootJVM]
     runs-on: ${{ matrix.os }}
@@ -54,6 +54,11 @@ jobs:
       - name: sbt update
         if: matrix.java == 'temurin@8' && steps.setup-java-temurin-8.outputs.cache-hit == 'false'
         run: sbt +update
+
+      - name: Setup NodeJS v23
+        uses: actions/setup-node@v3
+        with:
+          node-version: 23
 
       - name: Check that workflows are up to date
         run: sbt githubWorkflowCheck
@@ -82,15 +87,15 @@ jobs:
         run: sbt 'project ${{ matrix.project }}' '++ ${{ matrix.scala }}' doc
 
       - name: Make target directories
-        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
-        run: mkdir -p core/.js/target core/.jvm/target project/target
+        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v'))
+        run: mkdir -p core/js/target core/jvm/target example/target project/target
 
       - name: Compress target directories
-        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
-        run: tar cf targets.tar core/.js/target core/.jvm/target project/target
+        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v'))
+        run: tar cf targets.tar core/js/target core/jvm/target example/target project/target
 
       - name: Upload target directories
-        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
+        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v'))
         uses: actions/upload-artifact@v4
         with:
           name: target-${{ matrix.os }}-${{ matrix.java }}-${{ matrix.scala }}-${{ matrix.project }}
@@ -99,7 +104,7 @@ jobs:
   publish:
     name: Publish Artifacts
     needs: [build]
-    if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
+    if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v'))
     strategy:
       matrix:
         os: [ubuntu-22.04]
@@ -127,42 +132,47 @@ jobs:
         if: matrix.java == 'temurin@8' && steps.setup-java-temurin-8.outputs.cache-hit == 'false'
         run: sbt +update
 
-      - name: Download target directories (2.13, rootJS)
+      - name: Setup NodeJS v23
+        uses: actions/setup-node@v3
+        with:
+          node-version: 23
+
+      - name: Download target directories (3.6.3, rootJS)
         uses: actions/download-artifact@v4
         with:
-          name: target-${{ matrix.os }}-${{ matrix.java }}-2.13-rootJS
+          name: target-${{ matrix.os }}-${{ matrix.java }}-3.6.3-rootJS
 
-      - name: Inflate target directories (2.13, rootJS)
+      - name: Inflate target directories (3.6.3, rootJS)
         run: |
           tar xf targets.tar
           rm targets.tar
 
-      - name: Download target directories (2.13, rootJVM)
+      - name: Download target directories (3.6.3, rootJVM)
         uses: actions/download-artifact@v4
         with:
-          name: target-${{ matrix.os }}-${{ matrix.java }}-2.13-rootJVM
+          name: target-${{ matrix.os }}-${{ matrix.java }}-3.6.3-rootJVM
 
-      - name: Inflate target directories (2.13, rootJVM)
+      - name: Inflate target directories (3.6.3, rootJVM)
         run: |
           tar xf targets.tar
           rm targets.tar
 
-      - name: Download target directories (3, rootJS)
+      - name: Download target directories (3.3.5, rootJS)
         uses: actions/download-artifact@v4
         with:
-          name: target-${{ matrix.os }}-${{ matrix.java }}-3-rootJS
+          name: target-${{ matrix.os }}-${{ matrix.java }}-3.3.5-rootJS
 
-      - name: Inflate target directories (3, rootJS)
+      - name: Inflate target directories (3.3.5, rootJS)
         run: |
           tar xf targets.tar
           rm targets.tar
 
-      - name: Download target directories (3, rootJVM)
+      - name: Download target directories (3.3.5, rootJVM)
         uses: actions/download-artifact@v4
         with:
-          name: target-${{ matrix.os }}-${{ matrix.java }}-3-rootJVM
+          name: target-${{ matrix.os }}-${{ matrix.java }}-3.3.5-rootJVM
 
-      - name: Inflate target directories (3, rootJVM)
+      - name: Inflate target directories (3.3.5, rootJVM)
         run: |
           tar xf targets.tar
           rm targets.tar
@@ -221,10 +231,15 @@ jobs:
         if: matrix.java == 'temurin@8' && steps.setup-java-temurin-8.outputs.cache-hit == 'false'
         run: sbt +update
 
+      - name: Setup NodeJS v23
+        uses: actions/setup-node@v3
+        with:
+          node-version: 23
+
       - name: Submit Dependencies
         uses: scalacenter/sbt-dependency-submission@v2
         with:
-          modules-ignore: rootjs_2.13 rootjs_3 docs_2.13 docs_3 rootjvm_2.13 rootjvm_3 rootnative_2.13 rootnative_3
+          modules-ignore: rootjs_3 rootjs_3 docs_3 docs_3 rootjvm_3 rootjvm_3 rootnative_3 rootnative_3
           configs-ignore: test scala-tool scala-doc-tool test-internal
 
   site:
@@ -255,6 +270,11 @@ jobs:
       - name: sbt update
         if: matrix.java == 'temurin@8' && steps.setup-java-temurin-8.outputs.cache-hit == 'false'
         run: sbt +update
+
+      - name: Setup NodeJS v23
+        uses: actions/setup-node@v3
+        with:
+          node-version: 23
 
       - name: Setup Java (temurin@11)
         id: setup-java-temurin-11
