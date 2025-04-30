@@ -23,3 +23,10 @@ metals.sbt
 
 # npm
 node_modules/
+
+# dev env
+.direnv
+
+# demo stuff
+in.txt
+log.txt
