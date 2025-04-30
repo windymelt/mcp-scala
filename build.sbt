@@ -94,6 +94,15 @@ lazy val example = project
 
 lazy val docs = project.in(file("site")).enablePlugins(TypelevelSitePlugin)
 
+// to use --experimental-require-module
+ThisBuild / githubWorkflowJobSetup ++= Seq(
+  WorkflowStep.Use(
+    UseRef.Public("actions", "setup-node", "v3"),
+    name = Some("Setup NodeJS v23"),
+    params = Map("node-version" -> "23", "cache" -> "npm")
+  )
+)
+
 // Publish to Maven Central
 import xerial.sbt.Sonatype.sonatypeCentralHost
 ThisBuild / publishTo := sonatypePublishToBundle.value
