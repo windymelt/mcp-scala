@@ -20,6 +20,7 @@ ThisBuild / scmInfo := Some(
 
 // publish website from this branch
 ThisBuild / tlSitePublishBranch := Some("main")
+ThisBuild / tlCiReleaseBranches := Seq()
 
 val Scala3 = "3.6.3"
 ThisBuild / crossScalaVersions := Seq(Scala3, "3.3.5")
@@ -108,6 +109,6 @@ ThisBuild / githubWorkflowJobSetup ++= Seq(
 credentials += Credentials(
   "GnuPG Key ID",
   "gpg",
-  "foobar2000", // key identifier
+  "B588DDA3D3085F06DEA69CDF8ED2F321A52EEEA5", // key identifier
   "ignored" // this field is ignored; passwords are supplied by pinentry
 )
