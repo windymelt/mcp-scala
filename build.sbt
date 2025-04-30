@@ -1,5 +1,5 @@
 // https://typelevel.org/sbt-typelevel/faq.html#what-is-a-base-version-anyway
-ThisBuild / tlBaseVersion := "0.0" // your current series x.y
+ThisBuild / tlBaseVersion := "0.1" // your current series x.y
 
 ThisBuild / organization := "dev.capslock"
 ThisBuild / organizationName := "capslock.dev"
@@ -8,6 +8,13 @@ ThisBuild / licenses := Seq(License.MIT)
 ThisBuild / developers := List(
   // your GitHub handle and name
   tlGitHubDev("windymelt", "windymelt")
+)
+ThisBuild / homepage := Some(url("https://github.com/windymelt/mcp-scala"))
+ThisBuild / scmInfo := Some(
+  ScmInfo(
+    url("https://github.com/windymelt/mcp-scala"),
+    "https://github.com/windymelt/mcp-scala.git"
+  )
 )
 
 // publish website from this branch
@@ -28,6 +35,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
   .in(file("core"))
   .settings(
     name := "mcp-scala",
+    version := "0.1.0",
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "cats-core" % "2.13.0",
       "org.typelevel" %%% "cats-effect" % "3.6.0"
@@ -77,3 +85,8 @@ lazy val example = project
   )
 
 lazy val docs = project.in(file("site")).enablePlugins(TypelevelSitePlugin)
+
+// Publish to Maven Central
+import xerial.sbt.Sonatype.sonatypeCentralHost
+ThisBuild / publishTo := sonatypePublishToBundle.value
+ThisBuild / sonatypeCredentialHost := sonatypeCentralHost
