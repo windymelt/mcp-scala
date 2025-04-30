@@ -1,3 +1,4 @@
+import org.scalajs.jsenv.nodejs.NodeJSEnv
 // https://typelevel.org/sbt-typelevel/faq.html#what-is-a-base-version-anyway
 ThisBuild / tlBaseVersion := "0.1" // your current series x.y
 
@@ -71,7 +72,14 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
     )
   )
   .jsSettings(
-    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) }
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
+    jsEnv := new NodeJSEnv(
+      NodeJSEnv
+        .Config()
+        .withArgs(
+          List("--experimental-require-module")
+        )
+    )
   )
 
 lazy val example = project
