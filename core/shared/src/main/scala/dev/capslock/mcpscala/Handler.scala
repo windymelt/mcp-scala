@@ -21,12 +21,13 @@
 
 package dev.capslock.mcpscala
 
-import io.circe.syntax._
 import cats.effect.IO
-import dev.capslock.mcpscala.mcp.*
 import dev.capslock.mcpscala.JsonRpc.Params
-import scala.annotation.experimental
+import dev.capslock.mcpscala.mcp.*
 import dev.capslock.mcpscala.server.JsonSchema.genSchema
+import io.circe.syntax.*
+
+import scala.annotation.experimental
 
 object Handler {
   type MethodHandler[F[_]] =

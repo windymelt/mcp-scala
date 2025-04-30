@@ -22,11 +22,12 @@
 package dev.capslock.mcpscala
 package transport
 
-import cats.effect._
-import cats.syntax.all._
-import io.circe._
-import io.circe.parser._
-import io.circe.syntax._
+import cats.effect.*
+import cats.syntax.all.*
+import io.circe.*
+import io.circe.parser.*
+import io.circe.syntax.*
+
 import Handler.MethodHandlers
 
 object Server {

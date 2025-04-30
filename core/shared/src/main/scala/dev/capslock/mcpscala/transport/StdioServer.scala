@@ -22,10 +22,11 @@
 package dev.capslock.mcpscala
 package transport
 
-import cats.effect._
-import fs2._
+import cats.effect.*
+import fs2.*
 import fs2.io.stdin
 import fs2.io.stdout
+
 import Handler.MethodHandlers
 
 object StdioServer {

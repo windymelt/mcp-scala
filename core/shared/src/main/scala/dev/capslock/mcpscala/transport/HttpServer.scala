@@ -21,10 +21,10 @@
 
 package dev.capslock.mcpscala.transport
 
-import dev.capslock.mcpscala.Handler.MethodHandlers
 import cats.effect.IO
-import org.http4s._
-import org.http4s.dsl.io._
+import dev.capslock.mcpscala.Handler.MethodHandlers
+import org.http4s.*
+import org.http4s.dsl.io.*
 import org.http4s.headers.`Content-Type`
 
 object HttpServer {

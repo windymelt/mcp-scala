@@ -21,10 +21,12 @@
 
 package dev.capslock.mcpscala.mcp
 
-import io.circe.generic.semiauto
-import io.circe.{Codec, Decoder, Encoder}
+import io.circe.Codec
+import io.circe.Decoder
+import io.circe.Encoder
 import io.circe.derivation.Configuration
 import io.circe.derivation.ConfiguredEncoder
+import io.circe.generic.semiauto
 
 enum Method(val methodName: String) {
   case Initialize(

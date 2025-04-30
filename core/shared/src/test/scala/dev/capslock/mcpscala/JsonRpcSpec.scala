@@ -21,9 +21,9 @@
 
 package dev.capslock.mcpscala
 
-import io.circe._
-import io.circe.parser._
-import io.circe.syntax._
+import io.circe.*
+import io.circe.parser.*
+import io.circe.syntax.*
 
 class JsonRpcSpec extends BaseSpec:
   import JsonRpc._

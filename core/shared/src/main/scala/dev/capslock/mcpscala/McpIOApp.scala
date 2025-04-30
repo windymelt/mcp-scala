@@ -21,17 +21,17 @@
 
 package dev.capslock.mcpscala
 
+import cats.effect.ExitCode
+import cats.effect.IO
+import cats.syntax.all.*
+import com.comcast.ip4s.*
 import com.monovore.decline.*
 import com.monovore.decline.effect.*
 import dev.capslock.mcpscala.Handler.MethodHandlers
-import cats.effect.IO
-import dev.capslock.mcpscala.transport.StdioServer
 import dev.capslock.mcpscala.transport.HttpServer
-import cats.effect.ExitCode
-import org.http4s.server.Router
+import dev.capslock.mcpscala.transport.StdioServer
 import org.http4s.ember.server.EmberServerBuilder
-import cats.syntax.all.*
-import com.comcast.ip4s.*
+import org.http4s.server.Router
 
 abstract class McpIOApp(
     name: String,
