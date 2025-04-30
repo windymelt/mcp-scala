@@ -28,6 +28,7 @@ import dev.capslock.mcpscala.server.JsonSchema.genSchema
 import io.circe.syntax.*
 
 import scala.annotation.experimental
+import scala.annotation.unused
 
 object Handler {
   type MethodHandler[F[_]] =
@@ -96,8 +97,8 @@ object Handler {
   // private
 
   private def handleInitialize(
-      capabilities: ClientCapabilities,
-      clientInfo: Implementation,
+      @unused capabilities: ClientCapabilities,
+      @unused clientInfo: Implementation,
       protocolVersion: String
   ): IO[InitializeResult] = {
     val response = InitializeResult(
@@ -112,7 +113,7 @@ object Handler {
   }
 
   private def handleListTools(tools: Map[String, server.Tool[?]])(
-      cursor: Option[String]
+      @unused cursor: Option[String]
   ): IO[ListToolsResult] = {
     // TODO: pagenation
     val toolMap: Seq[Tool] = tools.map { case (name, tool) =>
@@ -205,7 +206,7 @@ object Handler {
               }
   }
 
-  @experimental
+  @experimental @unused
   private def byPositionHandler[F[_]: cats.Applicative, In <: Tuple, Out](
       func: In => F[Either[String, Out]]
   )(using

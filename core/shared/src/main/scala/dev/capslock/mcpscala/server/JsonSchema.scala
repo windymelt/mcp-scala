@@ -22,13 +22,11 @@
 package dev.capslock.mcpscala.server
 
 import io.circe.Json
-import io.circe.Printer
 import io.circe.syntax.*
 import sttp.apispec.Schema as ASchema
 import sttp.apispec.circe.*
 import sttp.tapir.*
 import sttp.tapir.docs.apispec.schema.*
-import sttp.tapir.generic.auto.*
 
 object JsonSchema {
   def genSchema[A](using tSchema: Schema[A]): Json = {
