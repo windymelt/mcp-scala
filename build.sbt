@@ -89,7 +89,8 @@ lazy val example = project
   .settings(
     name := "example",
     scalaJSUseMainModuleInitializer := true,
-    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) }
+    scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.ESModule) },
+    publish / skip := true
   )
 
 lazy val docs = project.in(file("site")).enablePlugins(TypelevelSitePlugin)
@@ -104,6 +105,9 @@ ThisBuild / githubWorkflowJobSetup ++= Seq(
 )
 
 // Publish to Maven Central
-import xerial.sbt.Sonatype.sonatypeCentralHost
-ThisBuild / publishTo := sonatypePublishToBundle.value
-ThisBuild / sonatypeCredentialHost := sonatypeCentralHost
+credentials += Credentials(
+  "GnuPG Key ID",
+  "gpg",
+  "foobar2000", // key identifier
+  "ignored" // this field is ignored; passwords are supplied by pinentry
+)
