@@ -37,7 +37,7 @@ lazy val core = crossProject(JVMPlatform, JSPlatform)
   .in(file("core"))
   .settings(
     name := "mcp-scala",
-    version := "0.1.0",
+    version := "0.1.1",
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "cats-core" % "2.13.0",
       "org.typelevel" %%% "cats-effect" % "3.6.0"
