@@ -114,3 +114,4 @@ credentials += Credentials(
 )
 import xerial.sbt.Sonatype.sonatypeCentralHost
 ThisBuild / sonatypeCredentialHost := sonatypeCentralHost
+sonatypeTimeoutMillis := 60 * 60 * 1000
