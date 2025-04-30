@@ -112,3 +112,5 @@ credentials += Credentials(
   "B588DDA3D3085F06DEA69CDF8ED2F321A52EEEA5", // key identifier
   "ignored" // this field is ignored; passwords are supplied by pinentry
 )
+import xerial.sbt.Sonatype.sonatypeCentralHost
+ThisBuild / sonatypeCredentialHost := sonatypeCentralHost
