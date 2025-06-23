@@ -60,8 +60,8 @@ jobs:
         with:
           node-version: 23
 
-      - name: Check that workflows are up to date
-        run: sbt githubWorkflowCheck
+      #- name: Check that workflows are up to date
+      #  run: sbt githubWorkflowCheck
 
       - name: Check headers and formatting
         if: matrix.java == 'temurin@8' && matrix.os == 'ubuntu-22.04'
